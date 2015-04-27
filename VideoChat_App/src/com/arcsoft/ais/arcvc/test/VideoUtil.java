@@ -85,10 +85,12 @@ public class VideoUtil {
 		return ret;
 	}
 	
+	//unused, commented by xdchen
 	public static void main(String args[]) throws Exception{
 		startVideoRecording("F:/out.h264");
 	}
 	
+	//unused, commented by xdchen
 	public static void startVideoRecording(String fileName) throws Exception{
 		Map<String, byte[]> map = getSPSAndPPS(fileName);
 		byte[] h264pps = map.get("pps");

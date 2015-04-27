@@ -585,12 +585,14 @@ public class CameraUtils {
 		values.put(MediaStore.MediaColumns.TITLE,"aa");
 		values.put(MediaStore.MediaColumns.DATE_ADDED,System.currentTimeMillis());
 
+
 		mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-		mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS);
-		mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-		mMediaRecorder.setAudioChannels(1);
-		mMediaRecorder.setAudioEncodingBitRate(128000);
-		mMediaRecorder.setAudioSamplingRate(8000);//8000  44100
+//		mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS);
+//		mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+//		mMediaRecorder.setAudioChannels(1);
+//		mMediaRecorder.setAudioEncodingBitRate(128000);
+//		mMediaRecorder.setAudioSamplingRate(8000);//8000  44100
+
 
 		Log.i(Global.TAG, " --------------initMediaRecorder !SocketUtils.getReceiverSocket()==" + SocketUtils.getAudioSenderSocket());
 		Log.i(Global.TAG, " --------------initMediaRecorder !SocketUtils.getSenderSocket()==" + SocketUtils.getAudioSenderSocket());

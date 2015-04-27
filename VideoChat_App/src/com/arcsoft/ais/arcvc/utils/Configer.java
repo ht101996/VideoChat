@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
-import com.arcsoft.coreapi.sdk.CoreVCAPI;
-
 import android.content.res.AssetManager;
 import android.util.Log;
 

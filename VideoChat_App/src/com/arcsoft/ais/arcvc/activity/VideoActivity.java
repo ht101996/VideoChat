@@ -435,7 +435,6 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 			
 			mMediaAudioRecorder.start();
 			CameraUtils.startAudioRecording();
-//			audioWrapper.startRecord();
 			
 		} else {
 			Log.i(Global.TAG, " --------------now playing!");
@@ -497,7 +496,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 	};
 
 	private static void handlerHandleMsg(Message msg) {
-		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd-HH:mm:ss", Locale.US);
+//		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd-HH:mm:ss", Locale.US);
 		//Log.i(Global.TAG, "VideoActivity Handler handleMessage>>>..current peerId: " + Configer.getValue("peer_id"));
 		//Log.i(Global.TAG, "VideoActivity Handler handleMessage>>>..from peerId: " + msg.getData().getString("gpid"));
 		if (msg.what == 1) {
@@ -579,7 +578,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 			}
 		} else if (msg.what == 2) { // video packet
 			int[] packet=msg.getData().getIntArray("packet");
-			Log.i(Global.TAG, "playing video packet length:" +packet.length);
+			Log.i(Global.TAG, "cxd...playing video packet length:" +packet.length);
 			Bitmap image = MyBitmap
 					.createMyBitmap(packet, msg.getData().getInt("width"), msg.getData().getInt("height"));
 			if (image != null) {

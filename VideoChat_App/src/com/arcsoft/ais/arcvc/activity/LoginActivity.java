@@ -91,7 +91,7 @@ public class LoginActivity extends Activity {
 		mEmail = getIntent().getStringExtra(EXTRA_EMAIL);
 		mEmailView = (EditText) findViewById(R.id.email);
 		if (mEmailView.getText() == null || "".equals(mEmailView.getText().toString())) {
-			mEmail = "nn@aa.aa" ;
+			mEmail = "mm@aa.aa" ;
 		}
 		mEmailView.setText(mEmail);
 

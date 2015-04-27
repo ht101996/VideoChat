@@ -570,10 +570,10 @@ int GetJniObjectReferenceForH264(JNIEnv *env, jobject jo, jobject odata, h264_na
 		h264nal.i_payload = jPayLoadLength;
 	}
 	env->DeleteLocalRef(cls);
-	LOGI("i_payload: %d" , h264nal.i_payload);
-	LOGI("i_type: %d" , h264nal.i_type);
-	LOGI("i_ref_idc: %d" , h264nal.i_ref_idc);
-	LOGI("p_payload length: %d" , env->GetArrayLength((jbyteArray)jPayload));
+//	LOGI("i_payload: %d" , h264nal.i_payload);
+//	LOGI("i_type: %d" , h264nal.i_type);
+//	LOGI("i_ref_idc: %d" , h264nal.i_ref_idc);
+//	LOGI("p_payload length: %d" , env->GetArrayLength((jbyteArray)jPayload));
 	return 1;
 }
 
@@ -800,8 +800,8 @@ int GetJniObjectReferenceForAAC(JNIEnv *env, jobject jo, jobject odata, aac_nal_
 		aacNal.i_payload = jPayLoadLength;
 	}
 	env->DeleteLocalRef(cls);
-	LOGI("i_payload: %d" , aacNal.i_payload);
-	LOGI("p_payload length: %d" , env->GetArrayLength((jbyteArray)jPayload));
+//	LOGI("i_payload: %d" , aacNal.i_payload);
+//	LOGI("p_payload length: %d" , env->GetArrayLength((jbyteArray)jPayload));
 	return 1;
 }
 
