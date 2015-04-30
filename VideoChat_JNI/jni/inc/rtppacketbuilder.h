@@ -45,6 +45,7 @@
 #include "rtptimeutilities.h"
 #include "rtptypes.h"
 #include "rtpmemoryobject.h"
+#include "pos_log.h"
 
 class RTPSources;
 
@@ -242,6 +243,7 @@ inline int RTPPacketBuilder::SetDefaultTimestampIncrement(uint32_t timestampinc)
 		return ERR_RTP_PACKBUILD_NOTINIT;
 	deftsset = true;
 	defaulttimestampinc = timestampinc;
+	POS_LOG("RTPPacketBuilder: defaulttimestampinc %d \n",defaulttimestampinc);
 	return 0;
 }
 

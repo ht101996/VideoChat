@@ -20,10 +20,20 @@ extern "C"{
 }
 #endif
 
+#define log_enable
+
+#ifdef log_enable
+
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "JNI", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "JNI", __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "JNI", __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, "JNI", __VA_ARGS__)
+#else
+#define LOGI(...)
+#define LOGE(...)
+#define LOGD(...)
+#define LOGW(...)
+#endif
 #define CORE_SAFEDELETE(p) if ((p) != NULL) { delete (p); (p) = NULL; }
 #define CORE_SAFEDELETEARRAY(p) if ((p) != NULL) { delete [] (p); (p) = NULL; }
 #define AUDIO_PLAY_DELAY_TIME	10000 //10ms 每播放完一帧时,需要延迟的时间 10000
@@ -41,6 +51,13 @@ enum eDecSpeed{
 	NORM_SPEED = 1,
 	TWOX_SPEED,
 	THREEX_SPEED
+};
+
+enum eRemoteDevice {
+	DEV_UNDEFINED,
+	DEV_ANDROID,
+	DEV_IOS,
+	DEV_PC
 };
 
 typedef struct
@@ -120,7 +137,7 @@ public:
 	int decodeVideoFrame();
 	int displayVideoImage();
 	int syncDisplayOneVideoImage(ImgElement* pImg, double currentAudioTime);
-	int syncDisplayVideoImage(double usedVideoTime);
+//	int syncDisplayVideoImage(double usedVideoTime);
     void ProcessRTPPacket(const RTPSourceData &srcdat, const RTPPacket &rtppack);
 	void SetAudioRTPSession(AudioRTPSession* audioSess) { m_audioSess = audioSess; }
 	AudioRTPSession* GetAudioRTPSession() { return m_audioSess; }
@@ -149,12 +166,13 @@ private:
     pthread_mutex_t* pLockDisplay;
     eDecSpeed m_decspeed;
     volatile double firstTimestamp;
-    double firstNTPTimestamp;
+    volatile double firstNTPTimestamp;
     double timestamp;
     double extraDeltaTime;
     uint32_t firstSequenceNum;
     uint32_t sequenceNum;
     AudioRTPSession* m_audioSess;
+    enum eRemoteDevice	 eFrom;
     bool mark;
     bool isSendEnded;
     char m_incrspeedcnt;
@@ -200,7 +218,7 @@ private:
     int   dst_nb_samples;
     enum AVSampleFormat dst_sample_fmt;
     volatile double firstTimestamp;
-    double firstNTPTimestamp; //firstTimestampOfVideo - firstTimestampOfAudio
+    volatile double firstNTPTimestamp; //firstTimestampOfVideo - firstTimestampOfAudio
     double audioMinusVideo;
     uint32_t firstSequenceNum;
     double	m_sleeptime;

@@ -110,6 +110,7 @@ public:
 
 	/** Returns the NTP time corresponding to the time stored in this instance. */
 	RTPNTPTime GetNTPTime() const;
+	uint32_t ntptimetran() const;
 
 	RTPTime &operator-=(const RTPTime &t);
 	RTPTime &operator+=(const RTPTime &t);
@@ -121,6 +122,7 @@ private:
 #if (defined(WIN32) || defined(_WIN32_WCE))
 	static inline unsigned __int64 CalculateMicroseconds(unsigned __int64 performancecount,unsigned __int64 performancefrequency);
 #endif // WIN32 || _WIN32_WCE
+
 
 	uint32_t sec,microsec;
 };
@@ -151,6 +153,16 @@ inline RTPTime::RTPTime(RTPNTPTime ntptime)
 		microsec = (uint32_t)x;
 	}
 }
+
+ inline uint32_t RTPTime::ntptimetran() const
+{
+ uint32_t recvtime, ntplsw, ntpmsw;
+ ntpmsw = GetSeconds() + (uint32_t)RTP_NTPTIMEOFFSET;
+ ntplsw = (uint32_t) ((double)GetMicroSeconds()*(65536.0*65536.0)/1000000.0);
+ recvtime = ((ntpmsw<<16)&0xFFFF0000)|((ntplsw>>16)&0x0000FFFF);
+  return recvtime;
+}
+
 
 #if (defined(WIN32) || defined(_WIN32_WCE))
 

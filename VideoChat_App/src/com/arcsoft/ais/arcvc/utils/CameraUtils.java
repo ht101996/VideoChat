@@ -15,19 +15,12 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 import android.app.Activity;
-import android.content.ContentResolver;
-import android.content.ContentValues;
 import android.hardware.Camera;
 import android.hardware.Camera.Parameters;
 import android.hardware.Camera.Size;
 import android.media.MediaRecorder;
-import android.net.Uri;
-import android.os.Environment;
-import android.provider.MediaStore;
-import android.provider.MediaStore.Audio.Media;
 import android.util.Log;
 import android.view.Surface;
-import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
 import com.arcsoft.ais.arcvc.bean.VideoConfig;
@@ -36,6 +29,7 @@ import com.arcsoft.ais.arcvc.jni.H264Nal;
 
 public class CameraUtils {
 
+	private static final String TAG =  "CameraUtils";
 	private static final Map<String, VideoConfig> videoConfigs = new HashMap<String, VideoConfig>();
 	private static Camera frontCamera ;
 	private static List<Size> supportedPreviewSizes;
@@ -133,7 +127,7 @@ public class CameraUtils {
 		int height = 0;
 		for (int i = 0; i < supportedPreviewSizes.size(); i++) {
 			Size size = supportedPreviewSizes.get(i);
-			if (size.width == 640) {//320
+			if (size.width == 320) {//320
 				width = size.width;
 				height = size.height;
 				break;
@@ -147,18 +141,17 @@ public class CameraUtils {
 	}
 
 	public static void getSPSPPS(SurfaceView sv) throws IOException {
+		long timeStart = System.currentTimeMillis();
 		MediaRecorder mMediaRecorder = new MediaRecorder();
 		frontCamera.unlock();
 		mMediaRecorder.setCamera(frontCamera);
 		mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
-		// mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
 		mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
 		mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-		// mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT);
 		mMediaRecorder.setVideoFrameRate(15);
 		String[] tmp = bestResolution.split("x");
 		mMediaRecorder.setVideoSize(Integer.parseInt(tmp[0]), Integer.parseInt(tmp[1]));
-		SurfaceHolder surfaceHolder = sv.getHolder() ;
+//		SurfaceHolder surfaceHolder = sv.getHolder() ;
 //		surfaceHolder.addCallback(callback);
 		mMediaRecorder.setPreviewDisplay(sv.getHolder().getSurface());
 		mMediaRecorder.setMaxDuration(1000);
@@ -173,7 +166,7 @@ public class CameraUtils {
 		}
 		
 		try {
-			Thread.sleep(1500l);
+			Thread.sleep(1500);
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -206,6 +199,7 @@ public class CameraUtils {
 			}
 		}
 		SdCardUtils.writeVcConfig(doc);
+		Log.v(TAG, "getSPSPPS cost time:"+(System.currentTimeMillis() - timeStart));
 	}
 
 	private static Map<String, byte[]> getSPSAndPPS(String fileName) throws IOException {
@@ -396,14 +390,14 @@ public class CameraUtils {
 						dis.read(buffer, 0, h264length);
 						long end = System.currentTimeMillis();
 						timeuse += end - start;
-						Log.i(Global.TAG, "encode cost time: " + timeuse);
+						Log.i(Global.TAG, "video encode cost time: " + timeuse);
 						byte[] naluData = Arrays.copyOfRange(buffer, 0, h264length);
 						if (naluData.length <= 0) {
 //							Log.e(Global.TAG, "recording====" + "loop naluData.length==" + naluData.length);
 							continue ;
 						}
-						nalu.setType(naluData[0] & 0x1f);
-						if (nalu.getType() == 5) { // IDR
+
+						if ((naluData[0] & 0x1f) == 5) { // IDR
 							nalu.setType(h264sps[0] & 0x1f);
 							nalu.setRefIdc((h264sps[0] & 0x60) >>> 5);
 							nalu.setPayload(h264sps);
@@ -416,6 +410,7 @@ public class CameraUtils {
 							nalu.setPayloadLength(h264pps.length);
 							P2PClientManager.getP2PClientInstance().send264Packet("pps", nalu);
 						}
+						nalu.setType(naluData[0] & 0x1f);
 						nalu.setRefIdc((naluData[0] & 0x60) >>> 5);
 						nalu.setPayload(naluData);
 						nalu.setPayloadLength(naluData.length);
@@ -423,7 +418,7 @@ public class CameraUtils {
 //						Log.d(Global.TAG, "send264Packet, naluData.length==" + nalu.getPayloadLength());
 					} catch (Exception e) {
 						e.printStackTrace();
-						break;
+//						break;
 					}
 				}
 				Log.d(Global.TAG, "recording====" + "loop ended....");
@@ -515,7 +510,7 @@ public class CameraUtils {
 //						Log.d(Global.TAG, "sendAACPacket, naluData.length==" + nalu.getPayloadLength());
 					} catch (Exception e) {
 						e.printStackTrace();
-						break;
+//						break;
 					}
 				}
 				Log.d(Global.TAG, "audio recording====" + "loop ended....");
@@ -581,18 +576,17 @@ public class CameraUtils {
 			mMediaRecorder.reset();
 		}
 		
-		ContentValues values=new ContentValues(3);
-		values.put(MediaStore.MediaColumns.TITLE,"aa");
-		values.put(MediaStore.MediaColumns.DATE_ADDED,System.currentTimeMillis());
+//		ContentValues values=new ContentValues(3);
+//		values.put(MediaStore.MediaColumns.TITLE,"aa");
+//		values.put(MediaStore.MediaColumns.DATE_ADDED,System.currentTimeMillis());
 
 
 		mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-//		mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS);
-//		mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-//		mMediaRecorder.setAudioChannels(1);
-//		mMediaRecorder.setAudioEncodingBitRate(128000);
-//		mMediaRecorder.setAudioSamplingRate(8000);//8000  44100
-
+		mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS);
+		mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+		mMediaRecorder.setAudioChannels(1);
+		mMediaRecorder.setAudioEncodingBitRate(128000);
+		mMediaRecorder.setAudioSamplingRate(8000);//8000  44100
 
 		Log.i(Global.TAG, " --------------initMediaRecorder !SocketUtils.getReceiverSocket()==" + SocketUtils.getAudioSenderSocket());
 		Log.i(Global.TAG, " --------------initMediaRecorder !SocketUtils.getSenderSocket()==" + SocketUtils.getAudioSenderSocket());

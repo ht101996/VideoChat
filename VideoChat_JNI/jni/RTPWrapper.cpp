@@ -258,12 +258,20 @@ void VideoRTPSession::addToNaluQueue(uint8_t* data, int len, double timestamp,
 	    uint32_t sequenceNumber)
 {
 //	FILE* fh264 = fopen("/mnt/sdcard/raw.h264", "ab");
+//	int pktlen = len/* data */ + sizeof(double)/* timestamp */ + sizeof(sequenceNumber)/* sequenceNumber */;
+//	fwrite(&pktlen, 1, sizeof(int), fh264);
+//	fwrite(&timestamp, 1, sizeof(double), fh264);
+//	fwrite(&sequenceNumber, 1, sizeof(uint32_t), fh264);
 //	fwrite(data, 1, len * sizeof(uint8_t), fh264);
 //	fclose(fh264);
 
 	if (len > 0) {
 		NaluElement* pNalu = new NaluElement;
 		pNalu->data = new uint8_t[len];
+		if (!pNalu->data) {
+			CORE_SAFEDELETE(pNalu);
+			return;
+		}
 		memcpy(pNalu->data, data, len * sizeof(uint8_t));
 		pNalu->len = len;
 		pNalu->timestamp = timestamp;
@@ -298,6 +306,10 @@ int VideoRTPSession::addToImageQueue(int* data, int width, int height, double ti
 
 	ImgElement* pImg = new ImgElement;
 	pImg->data = new int[len];
+	if (!pImg->data) {
+		CORE_SAFEDELETE(pImg);
+		return 1;
+	}
 	memcpy(pImg->data, data, len * sizeof(int));
 	pImg->width = width;
 	pImg->height = height;
@@ -326,9 +338,6 @@ int VideoRTPSession::addToImageQueue(int* data, int width, int height, double ti
 int VideoRTPSession::displayVideoImage()
 {
 //	return 1;
-	while (!isPlaying()) {
-		usleep(10000);
-	}
 	pthread_mutex_lock(pLockDisplay);
 	if (qImage->size() > 0) {
 //		static FILE* frgba = fopen("/mnt/sdcard/raw.rgba", "rb");
@@ -415,35 +424,36 @@ int VideoRTPSession::displayVideoImage()
 	return 0;
 }
 
-int VideoRTPSession::syncDisplayVideoImage(double currentAudioTime)
-{
-	while (qImage->size() > 0) {
-		pthread_mutex_lock(pLockDisplay);
-		ImgElement* pImg = qImage->front();
-
-//		if (qImage->size() > PACK_BUF_LIMIT) {
-//			for (int i = 0; i < (PACK_BUF_LIMIT - 10); ++i) {
-//				pImg = qImage->front();
-//				CORE_SAFEDELETEARRAY(pImg->data);
-//				CORE_SAFEDELETE(pImg);
-//				qImage->pop();
-//			}
+//int VideoRTPSession::syncDisplayVideoImage(double currentAudioTime)
+//{
+//	LOGD("VideoRTPSession syncDisplayVideoImage syncDisplayVideoImage start");
+//	while (qImage->size() > 0) {
+//		pthread_mutex_lock(pLockDisplay);
+//		ImgElement* pImg = qImage->front();
 //
-//			usleep(IMG_DISPLAY_INTERVAL); // image display interval
+////		if (qImage->size() > PACK_BUF_LIMIT) {
+////			for (int i = 0; i < (PACK_BUF_LIMIT - 10); ++i) {
+////				pImg = qImage->front();
+////				CORE_SAFEDELETEARRAY(pImg->data);
+////				CORE_SAFEDELETE(pImg);
+////				qImage->pop();
+////			}
+////
+////			usleep(IMG_DISPLAY_INTERVAL); // image display interval
+////		}
+//		int ret = syncDisplayOneVideoImage(pImg, currentAudioTime);
+//		if(ret == 0){
+//			CORE_SAFEDELETEARRAY(pImg->data);
+//			CORE_SAFEDELETE(pImg);
+//			qImage->pop();
+//			pthread_mutex_unlock(pLockDisplay);
+//		}else{
+//			pthread_mutex_unlock(pLockDisplay);
+//			break;
 //		}
-		int ret = syncDisplayOneVideoImage(pImg, currentAudioTime);
-		if(ret == 0){
-			CORE_SAFEDELETEARRAY(pImg->data);
-			CORE_SAFEDELETE(pImg);
-			qImage->pop();
-			pthread_mutex_unlock(pLockDisplay);
-		}else{
-			pthread_mutex_unlock(pLockDisplay);
-			break;
-		}
-	}
-	return 0;
-}
+//	}
+//	return 0;
+//}
 
 int VideoRTPSession::syncDisplayOneVideoImage(ImgElement* pImg, double currentAudioTime){
 //	double currentVideoTime = firstNTPTimestamp + ((double)pImg->timestamp - (double)firstTimestamp)*(1.0/VIDEO_SAMPLING_RATE) ;
@@ -467,26 +477,6 @@ int VideoRTPSession::syncDisplayOneVideoImage(ImgElement* pImg, double currentAu
 		pthread_mutex_unlock(g_pLockTimestamp);
 		curtime = stCurTime.tv_sec;
 	}
-
-//	FILE* flog = fopen("/mnt/sdcard/videodisplay.log", "a");
-//	if (flog) {
-//		struct  timeval    stCurTime;
-//		gettimeofday( &stCurTime, NULL );
-//		double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
-//		static double hittime = curtime;
-//		static double sign = 1;
-//		if (curtime - hittime > 100) {
-//			if (extraDeltaTime > 0.0009) {
-//				sign *= -1;
-//			} else if (extraDeltaTime < 0.0001) {
-//				sign *= -1;
-//			}
-//			extraDeltaTime += 0.0001 * sign;
-//			hittime = curtime;
-//		}
-//		fprintf(flog, "currentTime: %lf, currentVideoTime:%lf, currentAudioTime: %lf, diffTime: %lf, VSequenceNumber:%u\n", curtime, pImg->timestamp, currentAudioTime, diffTime, pImg->sequenceNumber);
-//		fclose(flog);
-//	}
 
 	static bool bSyncVideo = true;
 	static bool bDelay = true;
@@ -583,6 +573,7 @@ VideoRTPSession::VideoRTPSession()
 	, extraDeltaTime(0)
 	, sequenceNum(0)
 	, m_isPlaying(false)
+	, eFrom(DEV_UNDEFINED)
 {
 	av_register_all();
 
@@ -696,13 +687,17 @@ void VideoRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 {
 	LOGD("VideoRTPSession ProcessRTPPacket !");
 
+//	FILE* fh264 = fopen("/mnt/sdcard/raw.h264", "ab");
+//	size_t payloadlength = rtppack.GetPayloadLength();
+//	fwrite(&payloadlength, 1, sizeof(payloadlength), fh264);
+//	fwrite(rtppack.GetPayloadData(), 1, payloadlength, fh264);
+//	fclose(fh264);
+
 	//LOGD("VideoRTPSession timestamp:%u, mark: %d, __LINE__: %d\n",rtppack.GetTimestamp(), mark, __LINE__);
 	do {
 		if (mark) {// mark的pack是完整包的最后一个pack
 			LOGD("VideoRTPSession bufLen: %d, __LINE__: %d\n", bufLen, __LINE__);
 
-			RTPTime rtptime = srcdat.SR_GetNTPTimestamp();
-			LOGD("VideoRTPSession rtptime.GetDouble:%lf, __LINE__: %d\n",rtptime.GetDouble(), __LINE__);
 			addToNaluQueue(pNaluBuf, bufLen, timestamp, sequenceNum);
 			if (isSendEnded) {
 				isSendEnded = false;
@@ -732,14 +727,30 @@ void VideoRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 			pNaluBuf[2] = 0;
 			pNaluBuf[3] = 1;
 #endif
-			size_t len = rtppack.GetPayloadLength() - 8 - RTP_PKT_HEADER_LENGTH; // add nal unit start code
+			h264_nal_t nal;
+			nal.i_ref_idc = *rtppack.GetPayloadData();
+			nal.i_type = *(rtppack.GetPayloadData() + sizeof(int));
+			nal.i_payload = rtppack.GetPayloadLength() - 8 - RTP_PKT_HEADER_LENGTH; // add nal unit start code
 //			pNaluBuf = (uint8_t*)realloc(pNaluBuf, bufLen + len);
 //			if (NULL == pNaluBuf) {
 //				LOGE("Not enough memory, __LINE__: %d\n", __LINE__);
 //				break;
 //			}
-			memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() + 8 + RTP_PKT_HEADER_LENGTH, len);
-			bufLen += len;
+
+			nal.p_payload = rtppack.GetPayloadData() + 8 + RTP_PKT_HEADER_LENGTH;
+			if (eFrom == DEV_UNDEFINED) {
+				if (*nal.p_payload != 0x67) {
+					eFrom = DEV_PC;
+				} else {
+					eFrom = DEV_ANDROID;
+				}
+			}
+
+			if (eFrom == DEV_PC) {
+				pNaluBuf[bufLen++] = ( 0x00 << 7 ) | ( nal.i_ref_idc << 5 ) | nal.i_type;
+			}
+			memcpy(pNaluBuf + bufLen, nal.p_payload, nal.i_payload);
+			bufLen += nal.i_payload;
 
 			timestamp = *((double*)(rtppack.GetPayloadData() + 8));
 			sequenceNum = *((uint32_t*)(rtppack.GetPayloadData() + 8 + sizeof(double)));
@@ -755,15 +766,17 @@ void VideoRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 				firstSequenceNum = sequenceNum;
 			}
 			timestamp = firstTimestamp + (double)(sequenceNum - firstSequenceNum) * (VIDEO_TIMESTAMP_INCREMENT);
-			FILE* flog = fopen("/mnt/sdcard/videorecv.log", "a");
-			if (flog) {
-				struct  timeval    stCurTime;
-				gettimeofday( &stCurTime, NULL );
-				double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
-//				double currentVideoTime = firstNTPTimestamp + ((double)rtppack.GetTimestamp() - (double)firstTimestamp)*(1.0/VIDEO_SAMPLING_RATE) ;
-				fprintf(flog, "currentTime: %lf, firstTimestamp: %lf, Timestamp:%lf, SequenceNumber:%u\n", curtime, firstTimestamp, timestamp, sequenceNum);
-				fclose(flog);
-			}
+
+			LOGD("receive fps Timestamp:%lf, SequenceNumber:%u\n", timestamp, sequenceNum);
+//			FILE* flog = fopen("/mnt/sdcard/videorecv.log", "a");
+//			if (flog) {
+//				struct  timeval    stCurTime;
+//				gettimeofday( &stCurTime, NULL );
+//				double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
+////				double currentVideoTime = firstNTPTimestamp + ((double)rtppack.GetTimestamp() - (double)firstTimestamp)*(1.0/VIDEO_SAMPLING_RATE) ;
+//				fprintf(flog, "currentTime: %lf, firstTimestamp: %lf, Timestamp:%lf, SequenceNumber:%u\n", curtime, firstTimestamp, timestamp, sequenceNum);
+//				fclose(flog);
+//			}
 			LOGD("VideoRTPSession firstTimestamp:%lf, __LINE__: %d\n",firstTimestamp, __LINE__);
 			LOGD("VideoRTPSession  Timestamp:%lf, SequenceNumber:%u, __LINE__: %d\n", timestamp, sequenceNum, __LINE__);
 #if __DECODE__ == 0
@@ -823,25 +836,6 @@ int VideoRTPSession::decodeVideoFrame()
 			naluElem = *pNalu;
 			CORE_SAFEDELETE(pNalu);
 			qNalu->pop();
-
-//			char decspeed = (char)m_decspeed;
-//			while (--decspeed > 0) {
-//				if (qNalu->size() > 0) {
-//					pNalu = qNalu->front();
-//					CORE_SAFEDELETEARRAY(pNalu->data);
-//					CORE_SAFEDELETE(pNalu);
-//					qNalu->pop();
-//				}
-//			}
-
-//			if (qNalu->size() > VIDEO_PACK_BUF_LIMIT) {
-//				for (int i = 0; i < (VIDEO_PACK_BUF_LIMIT - 60); ++i) {
-//					pNalu = qNalu->front();
-//					CORE_SAFEDELETEARRAY(pNalu->data);
-//					CORE_SAFEDELETE(pNalu);
-//					qNalu->pop();
-//				}
-//			}
 		}
 		pthread_mutex_unlock(pLockDecode);
 		pkt.data = naluElem.data;
@@ -855,7 +849,7 @@ int VideoRTPSession::decodeVideoFrame()
 				notifyJNIShowImg((int*)pNaluBuf, bufLen / sizeof(int), 144, 176);
 			}
 #else
-			LOGD("pkt.stream_index is %d\n", pkt.stream_index);
+//			LOGD("pkt.stream_index is %d\n", pkt.stream_index);
 			if (pkt.stream_index == 0)
 			{
 				AVFrame *pFrame = av_frame_alloc();
@@ -866,6 +860,7 @@ int VideoRTPSession::decodeVideoFrame()
 				struct  timeval    end;
 				gettimeofday( &start, NULL );
 				ret = avcodec_decode_video2(video_dec_ctx, pFrame, &got_picture, &pkt);
+				LOGD("avcodec_decode_video2 ret = %d\n", ret);
 				CORE_SAFEDELETEARRAY(naluElem.data);
 				if (ret >= 0)
 				{
@@ -895,11 +890,12 @@ int VideoRTPSession::decodeVideoFrame()
 //							fprintf(flog, "ffmpeg decode video cost time is %ld\n", timeuse);
 //							fclose(flog);
 //						}
-						LOGD("ffmpeg decode video cost time is %ld\n", timeuse);
+						LOGD("ffmpeg decode video cost time is %ldus\n", timeuse);
 						LOGD("naluElem.timestamp is %lf\n", naluElem.timestamp);
 						LOGD("naluElem.sequenceNumber is %d\n", naluElem.sequenceNumber);
 
 						if (addToImageQueue((int*)pFrameRGB->data[0], video_dec_ctx->height, video_dec_ctx->width, naluElem.timestamp, naluElem.sequenceNumber)) {
+							tid_decode = 0;
 							return 1;
 						}
 						if (!tid_display) {
@@ -918,6 +914,7 @@ int VideoRTPSession::decodeVideoFrame()
 		// if (img_convert_ctx) {
 			// sws_freeContext(img_convert_ctx);
 		// }
+		av_free_packet(&pkt);
 	} while (false);
 	return 0;
 }
@@ -967,7 +964,7 @@ AudioRTPSession::AudioRTPSession()
 	, firstTimestamp(0)
 	, firstNTPTimestamp(0)
 	, firstSequenceNum(0)
-	, audioMinusVideo(-0.8)
+	, audioMinusVideo(0.8)
 	, m_sleeptime(AUDIO_PLAY_INTERVAL)
 	, m_videoSess(NULL)
 	, isSendEnded(true)
@@ -1081,28 +1078,28 @@ void AudioRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 			pthread_mutex_lock(g_pLockTimestamp);
 			firstTimestamp = GetVideoRTPSession()->getFirstTimestamp() ? GetVideoRTPSession()->getFirstTimestamp() : timestamp;
 			pthread_mutex_unlock(g_pLockTimestamp);
-			firstTimestamp -= audioMinusVideo;
+//			firstTimestamp -= audioMinusVideo;
 //			RTPTime rtptime = srcdat.SR_GetNTPTimestamp();
 //			firstNTPTimestamp = rtptime.GetDouble();
 		}
 		if (!firstSequenceNum) {
 			firstSequenceNum = sequenceNum;
 		}
-		timestamp = firstTimestamp + (double)(sequenceNum - firstSequenceNum) * AUDIO_TIMESTAMP_INCREMENT;
+		timestamp = firstTimestamp - audioMinusVideo + (double)(sequenceNum - firstSequenceNum) * AUDIO_TIMESTAMP_INCREMENT;
 
 		LOGD("AudioRTPSession firstNTPTimestamp:%lf, __LINE__: %d\n",firstNTPTimestamp, __LINE__);
 		LOGD("AudioRTPSession firstTimestamp:%lf, __LINE__: %d\n",firstTimestamp, __LINE__);
 		LOGD("AudioRTPSession Timestamp:%lf, SequenceNumber:%u, __LINE__: %d\n", timestamp, sequenceNum, __LINE__);
 
-		FILE* flog = fopen("/mnt/sdcard/audiorecv.log", "a");
-		if (flog) {
-			struct  timeval    stCurTime;
-			gettimeofday( &stCurTime, NULL );
-			double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
-//			double currentAudioTime = firstNTPTimestamp + ((double)rtppack.GetTimestamp() - (double)firstTimestamp)*(1.0/AUDIO_SAMPLING_RATE) ;
-			fprintf(flog, "currentTime:%lf, firstTimestamp:%lf, Timestamp:%lf, SequenceNumber:%u\n", curtime, firstTimestamp, timestamp, sequenceNum);
-			fclose(flog);
-		}
+//		FILE* flog = fopen("/mnt/sdcard/audiorecv.log", "a");
+//		if (flog) {
+//			struct  timeval    stCurTime;
+//			gettimeofday( &stCurTime, NULL );
+//			double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
+////			double currentAudioTime = firstNTPTimestamp + ((double)rtppack.GetTimestamp() - (double)firstTimestamp)*(1.0/AUDIO_SAMPLING_RATE) ;
+//			fprintf(flog, "currentTime:%lf, firstTimestamp:%lf, Timestamp:%lf, SequenceNumber:%u\n", curtime, firstTimestamp, timestamp, sequenceNum);
+//			fclose(flog);
+//		}
 
 		size_t len = rtppack.GetPayloadLength() - RTP_PKT_HEADER_LENGTH; // add nal unit start code
 		memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() + RTP_PKT_HEADER_LENGTH, len);
@@ -1133,9 +1130,6 @@ void AudioRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 int AudioRTPSession::playAudioPCM()
 {
 //	return 1;
-	while (!isPlaying()) {
-		usleep(10000);
-	}
 	pthread_mutex_lock(pLockPlay);
 	if (qPCM->size() > 0) {
 //		NaluElement* pPCM = qPCM->front();
@@ -1237,6 +1231,12 @@ int AudioRTPSession::playAudioPCM()
 		//TODO SYNC VEDIO show some images
 //		GetVideoRTPSession()->syncDisplayVideoImage(currentAudioTime);
 
+		while (qPCM->size() > AUDIO_PACK_BUF_LIMIT) {
+			NaluElement* pPCM = qPCM->front();
+			CORE_SAFEDELETEARRAY(pPCM->data);
+			CORE_SAFEDELETE(pPCM);
+			qPCM->pop();
+		}
 
 //		if (qPCM->size() > AUDIO_PACK_BUF_LIMIT) {
 //			for (int i = 0; i < (AUDIO_PACK_BUF_LIMIT - 10); ++i) {
@@ -1245,10 +1245,6 @@ int AudioRTPSession::playAudioPCM()
 //				CORE_SAFEDELETE(pPCM);
 //				qPCM->pop();
 //			}
-////			if (m_decspeed > NORM_SPEED) {
-////				m_incrspeedcnt = 0;
-////				m_decspeed = (eDecSpeed)((int)m_decspeed - 1);
-////			}
 //		}
 	}
 
@@ -1366,13 +1362,11 @@ int AudioRTPSession::decodeAudioFrame()
 //			}
 //		}
 
-		if (qAAC->size() > AUDIO_PACK_BUF_LIMIT) {
-			for (int i = 0; i < (AUDIO_PACK_BUF_LIMIT - 10); ++i) {
-				pAAC = qAAC->front();
-				CORE_SAFEDELETEARRAY(pAAC->data);
-				CORE_SAFEDELETE(pAAC);
-				qAAC->pop();
-			}
+		while (qAAC->size() > AUDIO_PACK_BUF_LIMIT) {
+			pAAC = qAAC->front();
+			CORE_SAFEDELETEARRAY(pAAC->data);
+			CORE_SAFEDELETE(pAAC);
+			qAAC->pop();
 		}
 	}
 	pthread_mutex_unlock(pLockDecode);
@@ -1482,11 +1476,13 @@ int AudioRTPSession::decodeAudioFrame()
 				ret = 0;
 				LOGD("aacElem.timestamp is %lf\n", aacElem.timestamp);
 				if (addToPCMQueue(dst_samples_data[0], dst_bufsize, aacElem.timestamp, aacElem.sequenceNumber)) {
+					tid_decode = 0;
 					return 1;
 				}
 			} else {
 				LOGD("aacElem.timestamp is %lf\n", aacElem.timestamp);
 				if (addToPCMQueue(pFrame->data[0], pFrame->nb_samples * src_sample_size, aacElem.timestamp, aacElem.sequenceNumber)) {
+					tid_decode = 0;
 					return 1;
 				}
 			}
@@ -1500,6 +1496,7 @@ int AudioRTPSession::decodeAudioFrame()
 		avpkt.data += len;
 	}
 
+	CORE_SAFEDELETEARRAY(aacElem.data);
 	av_free_packet(&avpkt);
 	usleep(32000); // audio play interval
 	return ret;
@@ -1509,7 +1506,7 @@ void AudioRTPSession::reset()
 {
 	firstSequenceNum = firstTimestamp = 0;
 	m_sleeptime = AUDIO_PLAY_INTERVAL;
-	audioMinusVideo = -0.4;
+	audioMinusVideo = 0.4;
 }
 
 void AVBaseRTPSession::OnPollThreadStep()

@@ -14,8 +14,8 @@
 // #define MAX_RTP_PKT_LENGTH 101384//(1024-12-8)
 #define MAX_AAC_FRAME_SIZE 8192*2 // 8192 == 2^13
 #define ADTS_HEADER_LENGTH 7
-#define AUDIO_TIMESTAMP_INCREMENT	1024 //160
-#define VIDEO_TIMESTAMP_INCREMENT	6000 //3600
+#define AUDIO_TIMESTAMP_INCREMENT	1024 // 160
+#define VIDEO_TIMESTAMP_INCREMENT	3000 // 30 fps
 
 enum {
 	//MSG_TYPE_DEFAULT = 0,
@@ -464,15 +464,16 @@ void SendH264Nalu(h264_nal_t* nalHdr, RTPSession& sess, const char* szPktType) {
 
 	if (!strcmp(szPktType, "img")) {
 		++videoSequenceNum;
-		FILE* flog = fopen("/mnt/sdcard/videoSend.log", "a");
-		if (flog) {
-			fprintf(flog, "SendH264Nalu currentTime: %lf, SequenceNumber: %u\n", curtime, videoSequenceNum);
-			fclose(flog);
-		}
+		LOGD("Send fps: %lf, currentTime: %lf, SequenceNumber: %u\n",(videoSequenceNum/curtime), curtime, videoSequenceNum);
+//		FILE* flog = fopen("/mnt/sdcard/videoSend.log", "a");
+//		if (flog) {
+//			fprintf(flog, "SendH264Nalu currentTime: %lf, SequenceNumber: %u\n", curtime, videoSequenceNum);
+//			fclose(flog);
+//		}
 	}
 
 	int status;
-	LOGD("SendH264Nalu ! ");
+//	LOGD("SendH264Nalu ! ");
 	if (buflen <= MAX_RTP_PKT_LENGTH - pos - RTP_PKT_HEADER_LENGTH) { // 一包就能搞定
 		sess.SetDefaultMark(true); // 因为是最后一包，所以true
 
@@ -505,8 +506,10 @@ void SendH264Nalu(h264_nal_t* nalHdr, RTPSession& sess, const char* szPktType) {
 		k = restBufLen / (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH); // 要分几个完整包
 		l = restBufLen % (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH); // 最后剩余的字节不足一个包
 
-		int i = 0;
-		for (i = 0; i < k; i++) {
+		for (int i = 0; i < k; i++) {
+			if(i == (k-1) && l == 0) { // 因为是最后一包，所以true
+				sess.SetDefaultMark(true);
+			}
 			pos = 0;
 			memcpy(sendbuf + pos, &curtime, sizeof(double));
 			pos += sizeof(double);
@@ -702,11 +705,11 @@ void SendAACNalu(aac_nal_t* nalHdr, RTPSession& sess) {
 			double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
 			++audioSequenceNum;
 
-			FILE* flog = fopen("/mnt/sdcard/audioSend.log", "a");
-			if (flog) {
-				fprintf(flog, "SendAACNalu currentTime:%lf, SequenceNumber: %u\n", curtime, audioSequenceNum);
-				fclose(flog);
-			}
+//			FILE* flog = fopen("/mnt/sdcard/audioSend.log", "a");
+//			if (flog) {
+//				fprintf(flog, "SendAACNalu currentTime:%lf, SequenceNumber: %u\n", curtime, audioSequenceNum);
+//				fclose(flog);
+//			}
 
 			if (buflen <= MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH) { // 一包就能搞定
 				sess.SetDefaultMark(true); // 因为是最后一包，所以true
@@ -740,8 +743,10 @@ void SendAACNalu(aac_nal_t* nalHdr, RTPSession& sess) {
 				k = restBufLen / (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH); // 要分几个完整包
 				l = restBufLen % (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH); // 最后剩余的字节不足一个包
 
-				int i = 0;
-				for (i = 0; i < k; i++) {
+				for (int i = 0; i < k; i++) {
+					if(i == (k-1) && l == 0) { // 因为是最后一包，所以true
+						sess.SetDefaultMark(true);
+					}
 					pos = 0;
 					memcpy(sendbuf + pos, &curtime, sizeof(double));
 					pos += sizeof(double);

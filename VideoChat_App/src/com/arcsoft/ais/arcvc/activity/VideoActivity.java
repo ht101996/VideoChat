@@ -2,12 +2,9 @@ package com.arcsoft.ais.arcvc.activity;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -19,7 +16,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.hardware.Camera;
-import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Handler;
@@ -27,25 +23,17 @@ import android.os.Message;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.View.OnKeyListener;
 import android.view.View.OnTouchListener;
-import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.RelativeLayout.LayoutParams;
 import android.widget.ImageView;
-import android.widget.ListAdapter;
-import android.widget.ListView;
-import android.widget.ProgressBar;
+import android.widget.RelativeLayout.LayoutParams;
 import android.widget.ScrollView;
-import android.widget.TextView;
 
 import com.arcsoft.ais.arcvc.R;
 import com.arcsoft.ais.arcvc.adapter.DialogAdapter;
@@ -56,10 +44,9 @@ import com.arcsoft.ais.arcvc.utils.Global;
 import com.arcsoft.ais.arcvc.utils.MyBitmap;
 import com.arcsoft.ais.arcvc.utils.P2PClientManager;
 import com.arcsoft.ais.arcvc.utils.SocketUtils;
-import com.arcsoft.ais.arcvc.utils.audio.receiver.AudioDecoder;
-import com.arcsoft.ais.arcvc.utils.audio.receiver.AudioPlayer;
-import com.arcsoft.ais.arcvc.utils.audio.receiver.AudioReceiver;
 import com.arcsoft.ais.arcvc.utils.audio.AudioWrapper;
+import com.arcsoft.ais.arcvc.utils.audio.receiver.AudioPlayer;
+import com.arcsoft.videochat.mediarecorder.AudioRecorderWrapper;
 
 
 
@@ -78,7 +65,8 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 	static DialogAdapter dialogAdapter;
 	private static Camera myCamera;
 	private static MediaRecorder mMediaRecorder;
-	private static MediaRecorder mMediaAudioRecorder;
+	private AudioRecorderWrapper mAudioRecorderWrapper;
+//	private static MediaRecorder mMediaAudioRecorder;
 //	private static boolean usingCam = false;
 	private static Dialog applyAlertDialog;
 	private static AlertDialog.Builder alertDialogBuilder;
@@ -146,7 +134,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 		PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE); 
 		mWakeLock = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP, "LOCK_TAG"); 
 		
-
+		initMediaConfig();
 		Log.i(Global.TAG, "VideoActivity: onCreate============finished!");
 	}
 
@@ -211,6 +199,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 		if(null != mWakeLock) {
 		    mWakeLock.release();
 		}
+		mAudioRecorderWrapper.releaseRecorder();
 	};
 
 	@Override
@@ -230,11 +219,10 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 			new StartCameraRecording().start();
 		}
     }
-//	@Override
-//	private void onPostExecute(Bundle savedInstanceState) {
-//		// TODO Auto-generated method stub
-//
-//	}
+
+	private void initMediaConfig() {
+		mAudioRecorderWrapper = new AudioRecorderWrapper();
+	}
 	class StartCameraRecording extends Thread{
 		@Override
 		public void run() {
@@ -396,7 +384,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 	}
 
 	@SuppressLint("NewApi")
-	public static void startCameraRecording() {
+	public void startCameraRecording() {
 		Log.i(Global.TAG, " --------------startCameraRecording start!");
 
 		if (!CameraUtils.isUsingCam()) {
@@ -421,10 +409,11 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 
 			myCamera.unlock();
 			mMediaRecorder = CameraUtils.initMediaRecorder(surfaceView_myself,mMediaRecorder,myCamera);
-			mMediaAudioRecorder = CameraUtils.initAudioRecorder(mMediaAudioRecorder);
+//			mMediaAudioRecorder = CameraUtils.initAudioRecorder(mMediaAudioRecorder);
+			
 			try {
 				mMediaRecorder.prepare();
-				mMediaAudioRecorder.prepare();
+//				mMediaAudioRecorder.prepare();
 			} catch (IllegalStateException e) {
 				e.printStackTrace();
 			} catch (IOException e) {
@@ -433,7 +422,8 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 			mMediaRecorder.start();
 			CameraUtils.startVideoRecording();
 			
-			mMediaAudioRecorder.start();
+//			mMediaAudioRecorder.start();
+			mAudioRecorderWrapper.startRecorder();
 			CameraUtils.startAudioRecording();
 			
 		} else {
@@ -471,7 +461,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 		return handler;
 	}
 
-	private static class MyHandler extends Handler {
+	private  class MyHandler extends Handler {
 
 		// private static Handler handler = new Handler() {
 		private final WeakReference<Activity> myActivity;
@@ -495,7 +485,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 
 	};
 
-	private static void handlerHandleMsg(Message msg) {
+	private void handlerHandleMsg(Message msg) {
 //		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd-HH:mm:ss", Locale.US);
 		//Log.i(Global.TAG, "VideoActivity Handler handleMessage>>>..current peerId: " + Configer.getValue("peer_id"));
 		//Log.i(Global.TAG, "VideoActivity Handler handleMessage>>>..from peerId: " + msg.getData().getString("gpid"));

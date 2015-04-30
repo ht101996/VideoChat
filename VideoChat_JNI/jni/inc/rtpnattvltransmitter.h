@@ -222,6 +222,7 @@ public:
 class RTPNATTVLTransmitter : public RTPTransmitter
 {
 	friend class CRTPCallBack;
+	friend class RTPSession;
 
 public:
 	RTPNATTVLTransmitter(RTPMemoryManager *mgr);
