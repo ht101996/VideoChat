@@ -4,7 +4,7 @@
     android:versionName="1.0" >
 
     <uses-sdk
-        android:minSdkVersion="14"
+        android:minSdkVersion="16"
         android:targetSdkVersion="19" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -54,6 +54,13 @@
             android:windowSoftInputMode="adjustResize|stateHidden"
         	android:screenOrientation="portrait" >
         </activity>
+         <activity
+            android:name="com.arcsoft.ais.arcvc.activity.VideoChatActivity"
+            android:label="@string/title_activity_video"
+            android:windowSoftInputMode="adjustResize|stateHidden"
+        	android:screenOrientation="portrait" >
+        </activity>
+        
     </application>
 
 </manifest>

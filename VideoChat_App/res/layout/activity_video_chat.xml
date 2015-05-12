@@ -1,0 +1,47 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" >
+
+
+    <RelativeLayout
+        android:id="@+id/camera_fragment"
+        android:layout_width="120dp"
+        android:layout_height="160dp"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginRight="25dp"
+        android:layout_marginTop="15dp" >
+    </RelativeLayout>
+
+    <ImageView
+        android:id="@+id/video_image"
+        android:layout_width="240dp"
+        android:layout_height="320dp"
+        android:layout_alignParentLeft="true"
+        android:layout_below="@+id/camera_fragment"
+        android:layout_marginLeft="13dp"
+        android:layout_marginTop="28dp"
+        android:src="@drawable/ic_launcher" />
+
+    <Button
+        android:id="@+id/stopBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignTop="@+id/camera_fragment"
+        android:layout_marginLeft="32dp"
+        android:layout_toRightOf="@+id/startBtn"
+        android:background="@drawable/btn_style"
+        android:text="Stop" />
+
+    <Button
+        android:id="@+id/startBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/stopBtn"
+        android:layout_alignBottom="@+id/stopBtn"
+        android:layout_alignLeft="@+id/video_image"
+        android:background="@drawable/btn_style"
+        android:text="Start" />
+
+</RelativeLayout>
