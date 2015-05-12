@@ -6,13 +6,14 @@ import java.util.Set;
 
 import com.arcsoft.ais.arcvc.utils.Global;
 
+
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
 
 public class P2PClient {
-	
+	public static final String TAG = "P2PClient";
 	static Set<Handler> handlersList = new HashSet<Handler>();
 	
 	static {
@@ -53,9 +54,9 @@ public class P2PClient {
 	
 	public native void startRTPSession(String gpidOfRemotePeer);
 	
-	public native void send264Packet(String gpid, H264Nal nalu);
+	public native void send264Packet(String packetType, H264Nal nalu);
 	
-	public native void sendAACPacket(String gpid,AACNal nalu);
+	public native void sendAACPacket(String packetType,AACNal nalu);
 
 	/**
 	 * invoked by jni, when received a msg, show on the UI
@@ -77,12 +78,12 @@ public class P2PClient {
 		Bundle bundle = new Bundle();
 		bundle.putString("msg", msg);
 		bundle.putString("gpid", gpid);
-		Log.i(Global.TAG, "onMsgReceive m.what,GPID,MSG=" + m.what+ ","+ gpid+ ","+msg);
+		Log.i(TAG, "onMsgReceive m.what,GPID,MSG=" + m.what+ ","+ gpid+ ","+msg);
 		//Log.i(Global.TAG, "onMsgReceive handlersList.size()=" + handlersList.size());
 		m.setData(bundle);
 		for (Handler handler : handlersList) {
 			handler.sendMessage(m);//Pushes a message
-			Log.i(Global.TAG, "handler=" + handler.getClass());
+			Log.i(TAG, "handler=" + handler.getClass());
 		}
 	}
 	
@@ -114,18 +115,18 @@ public class P2PClient {
 		}
 	}
 	public void addHandler(Handler handler){
-		Log.i(Global.TAG, "addHandler=");
+		Log.i(TAG, "addHandler=");
 		handlersList.add(handler);
 		for (Handler handler1 : handlersList) {
-			Log.i(Global.TAG, "handler1=" + handler1.getClass());
+			Log.i(TAG, "handler1=" + handler1.getClass());
 		}
 	}
 
 	public void removeHandler(Handler handler){
-		Log.i(Global.TAG, "removeHandler=");
+		Log.i(TAG, "removeHandler=");
 		handlersList.remove(handler);
 		for (Handler handler1 : handlersList) {
-			Log.i(Global.TAG, "handler1=" + handler1.getClass());
+			Log.i(TAG, "handler1=" + handler1.getClass());
 		}
 	}
 }

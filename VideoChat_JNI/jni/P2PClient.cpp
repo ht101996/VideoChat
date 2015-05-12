@@ -149,9 +149,9 @@ void CCmClientCallBack::HandleCmcEvent(DWORD msgType, DWORD wParam, LPARAM pPara
 		__android_log_print(ANDROID_LOG_INFO, "HandleCmcEvent ", "msg: %s\n",msg);
 		Uint32 timestamp = 0;
 		memcpy(&timestamp, msg, 4);
-		if (((Tpos_addr*) srcAddr)->type == POS_ADDR_SOCK) {
-		} else {
-		}
+//		if (((Tpos_addr*) srcAddr)->type == POS_ADDR_SOCK) {
+//		} else {
+//		}
 		struct tm* sendtime = localtime((time_t*) &timestamp);
 		if (((Tpos_addr*) srcAddr)->type == POS_ADDR_SOCK) {
 			pIClient->SendToip((char*) msg, 4,
@@ -341,7 +341,7 @@ jstring JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_getLocalGpid(JNIEnv * e
 	return string1;
 }
 
-char g_destGPID[100];
+char g_destGPID[100];//FOR DEBUG LOG
 
 void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_startRTPSession
   (JNIEnv * env, jobject clazz, jstring gpidOfRemotePeer)

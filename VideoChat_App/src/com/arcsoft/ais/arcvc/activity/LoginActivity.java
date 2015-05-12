@@ -22,9 +22,6 @@ import android.widget.TextView;
 
 import com.arcsoft.ais.arcvc.R;
 import com.arcsoft.ais.arcvc.service.BootupService;
-import com.arcsoft.ais.arcvc.test.P2PClientManager;
-import com.arcsoft.ais.arcvc.test.VideoUtil;
-import com.arcsoft.ais.arcvc.test.socket.TestSocketClient;
 import com.arcsoft.ais.arcvc.utils.Configer;
 import com.arcsoft.ais.arcvc.utils.Global;
 import com.arcsoft.ais.arcvc.utils.NetworkUtils;
