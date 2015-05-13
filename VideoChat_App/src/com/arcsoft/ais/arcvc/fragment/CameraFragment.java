@@ -22,6 +22,7 @@ import android.view.ViewGroup;
 import com.arcsoft.ais.arcvc.R;
 import com.es.app.videochat.recorder.ESNativeH264Encoder;
 import com.es.app.videochat.recorder.ESVideoQuality;
+import com.es.app.videochat.recorder.ESRecordListener.OnEncoderListener;
 
 public class CameraFragment extends Fragment implements PreviewCallback {
 	private final int previewFormat = ImageFormat.NV21;
@@ -223,7 +224,14 @@ public class CameraFragment extends Fragment implements PreviewCallback {
 	
 	private void initH264Encoder() {
 		h264Encoder = new ESNativeH264Encoder(previewFormat);
+		h264Encoder.setEncoderListener(encoderListener);	
 		ESVideoQuality videoQuality = new ESVideoQuality(previewWidth,previewHeight,previewFps,125000);
 		h264Encoder.setupCodec(videoQuality);
+		
+		
+	}
+	private OnEncoderListener encoderListener;
+	public void setEncoderListener(OnEncoderListener listener) {
+		this.encoderListener = listener;
 	}
 }

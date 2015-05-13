@@ -18,7 +18,9 @@ import android.os.Message;
 import android.app.FragmentTransaction;
 import android.util.Log;
 import android.view.Menu;
+import android.view.Surface;
 import android.view.SurfaceView;
+import android.view.TextureView;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
@@ -35,6 +37,8 @@ import com.arcsoft.ais.arcvc.utils.P2PClientManager;
 import com.arcsoft.ais.arcvc.utils.SocketUtils;
 import com.arcsoft.ais.arcvc.utils.audio.receiver.AudioPlayer;
 import com.arcsoft.videochat.mediarecorder.AudioRecorderWrapper;
+import com.es.app.videochat.recorder.ESRecordListener.OnEncoderListener;
+import com.es.app.videochat.recorder.H264Decoder;
 
 public class VideoChatActivity extends Activity implements View.OnClickListener{
 	static String friendNickname;
@@ -58,6 +62,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	static long friendUserId;
 	static ArrayList<String> friendPeerIds;
 	private CameraFragment cameraFragment;
+	private TextureView mPlaybackView;
 	
 	private static AudioPlayer audioPlayer = AudioPlayer.getInstance();
 	@Override
@@ -103,6 +108,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		setTitle(getTitle()+" with "+friendNickname);
 		findViewById(R.id.startBtn).setOnClickListener(this);
 		findViewById(R.id.stopBtn).setOnClickListener(this);
+		mPlaybackView = (TextureView) findViewById(R.id.PlaybackView);
 		addCameraFragment();
 	}
 	
@@ -123,14 +129,31 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	
 	private void addCameraFragment() {
 		cameraFragment = new CameraFragment(320, 240, 15);
+		cameraFragment.setEncoderListener(encoderListener);
 		FragmentTransaction ft = getFragmentManager().beginTransaction();
 		ft.add(R.id.camera_fragment, cameraFragment);
 		ft.commit();
+		
+	}
+	//for test
+	private H264Decoder decoder;
+	private void startDecode(Surface surface) {
+		decoder = new H264Decoder(320, 240, 15);
+		decoder.setupDecoder(surface);
 	}
 	
+	private OnEncoderListener encoderListener = new OnEncoderListener() {
+		
+		@Override
+		public void onEncodeFinished(byte[] data, int length) {
+			decoder.onFrame(data, 0, length, 0);
+			
+		}
+	};
 	private void startChat() {
 		if(cameraFragment != null)
 			cameraFragment.startSendData();
+		startDecode(new Surface(mPlaybackView.getSurfaceTexture()));
 	}
 	
 	private void stopChat() {

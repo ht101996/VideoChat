@@ -44,4 +44,12 @@
         android:background="@drawable/btn_style"
         android:text="Start" />
 
+    <TextureView
+        android:id="@+id/PlaybackView"
+        android:layout_width="120dp"
+        android:layout_height="160dp"
+        android:layout_alignParentRight="true"
+        android:layout_alignTop="@+id/video_image"
+        android:layout_marginTop="25dp" />
+
 </RelativeLayout>

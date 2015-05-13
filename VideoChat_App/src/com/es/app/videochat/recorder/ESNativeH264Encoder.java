@@ -272,7 +272,6 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 		}catch(Exception e) {
 			e.printStackTrace();
 		}
-		
 	}
 	
 	@Override
@@ -347,7 +346,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 								pos += m_info.length;  
 							}	
 						    
-						    output(outputH264Frame);
+//						    output(outputH264Frame);
 						    if(encoderListener != null)
 						    	encoderListener.onEncodeFinished(outputH264Frame, pos);
 					    }
