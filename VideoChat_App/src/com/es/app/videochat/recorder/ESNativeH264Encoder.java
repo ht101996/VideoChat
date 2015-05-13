@@ -1,13 +1,16 @@
 package com.es.app.videochat.recorder;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
 
-import android.app.AlertDialog;
+import android.graphics.ImageFormat;
 import android.media.MediaCodec;
 import android.media.MediaCodec.BufferInfo;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaFormat;
+import android.os.Environment;
 import android.util.Log;
 
 public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnable {
@@ -28,7 +31,9 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
     
     private Thread encodeThread = null;
 
-    int colorFormat = 0;
+    private int colorFormat = 0;
+    
+    private int inputDataImageFormat;//only support ImageFormat.NV21, ImageFormat.YV12.
     
     public static byte[] YV12toYUV420PackedSemiPlanar(final byte[] input, final byte[] output, final int width, final int height) {
         /* 
@@ -46,6 +51,23 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
         }
         return output;
     }
+   
+    public static byte[] NV21toYUV420PackedSemiPlanar(final byte[] input, final byte[] output, final int width, final int height) {
+        /* 
+         * COLOR_TI_FormatYUV420PackedSemiPlanar is NV12.(plane[0]->Y, plane[1]->UV)
+         * So we just have to reverse U and V.
+         */
+        final int frameSize = width * height;
+        final int qFrameSize = frameSize/4;
+
+        System.arraycopy(input, 0, output, 0, frameSize); // Y
+
+        for (int i = 0; i < qFrameSize; i++) {
+            output[frameSize + i*2] = input[frameSize + i*2 + 1]; // Cb (U)
+            output[frameSize + i*2 + 1] = input[frameSize + i*2]; // Cr (V)
+        }
+        return output;
+    }
     
     public static byte[] YV12toYUV420Planar(byte[] input, byte[] output, int width, int height) {
         /* 
@@ -59,6 +81,22 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
         System.arraycopy(input, frameSize, output, frameSize + qFrameSize, qFrameSize); // Cr (V)
         System.arraycopy(input, frameSize + qFrameSize, output, frameSize, qFrameSize); // Cb (U)
 
+        return output;
+    }
+    public static byte[] NV21toYUV420Planar(byte[] input, byte[] output, int width, int height) {
+        /* 
+         * COLOR_FormatYUV420Planar is I420 which is like YV12, but with U and V reversed.(plane[0]->Y, plane[1]->U, plane[2]->V)
+         * We convert by putting the corresponding U and V bytes together (interleaved), and reverse U and V.
+         */
+        final int frameSize = width * height;
+        final int qFrameSize = frameSize/4;
+
+        System.arraycopy(input, 0, output, 0, frameSize); // Y
+        
+        for (int i = 0; i < qFrameSize; i++) {
+            output[frameSize + i] = input[frameSize + i*2 + 1]; // Cb (U)
+            output[frameSize + qFrameSize + i] = input[frameSize + i*2]; // Cr (V)
+        }
         return output;
     }
     
@@ -79,6 +117,14 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
             }
         }
         return null;
+    }
+    
+    /**
+     * 
+     * @param imageFormat support ImageFormat.NV21 or ImageFormat.YV12.
+     */
+    public ESNativeH264Encoder(int imageFormat) {
+    	inputDataImageFormat = imageFormat;
     }
 	@Override
 	public boolean setupCodec(ESVideoQuality videoQuality)
@@ -213,6 +259,21 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 			}
 		}
 	}
+	String outputFile = Environment.getExternalStorageDirectory().getAbsolutePath().concat(File.separator).concat("testouputstream");
+	int outputindex = 1;
+	private void output(byte[] input) {
+		FileOutputStream fos;
+		try{
+			fos = new FileOutputStream( new File(outputFile.concat(outputindex+".txt")), true);
+			fos.write(input);
+			fos.flush();
+			fos.close();
+			outputindex ++;
+		}catch(Exception e) {
+			e.printStackTrace();
+		}
+		
+	}
 	
 	@Override
 	public void run() {
@@ -226,13 +287,10 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 			
 			if(null == mutex)
 				continue;
-			
 			synchronized(mutex)
 			{
 				try {
-					
 					mutex.wait();
-					
 					ByteBuffer[] outputBuffers = mediaCodec.getOutputBuffers();
 							        			
 					while(!Thread.interrupted())
@@ -289,6 +347,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 								pos += m_info.length;  
 							}	
 						    
+						    output(outputH264Frame);
 						    if(encoderListener != null)
 						    	encoderListener.onEncodeFinished(outputH264Frame, pos);
 					    }
@@ -306,14 +365,33 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 		case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar:
 		case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedPlanar:
 		{
-			YV12toYUV420Planar(data, inputFrame, videoQuality.resX, videoQuality.resY);
+			switch (inputDataImageFormat) {
+			case ImageFormat.YV12:
+				YV12toYUV420Planar(data, inputFrame, videoQuality.resX, videoQuality.resY);
+				break;
+			case ImageFormat.NV21:
+				NV21toYUV420Planar(data, inputFrame, videoQuality.resX, videoQuality.resY);
+				break;
+			default:
+				break;
+			}
 		}
 			break;
-		case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar:
+		case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar://
         case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar:
         case MediaCodecInfo.CodecCapabilities.COLOR_TI_FormatYUV420PackedSemiPlanar:
         {
-        	YV12toYUV420PackedSemiPlanar(data, inputFrame, videoQuality.resX, videoQuality.resY);
+        	switch (inputDataImageFormat) {
+			case ImageFormat.YV12:
+				YV12toYUV420PackedSemiPlanar(data, inputFrame, videoQuality.resX, videoQuality.resY);
+				break;
+			case ImageFormat.NV21:
+				NV21toYUV420PackedSemiPlanar(data, inputFrame, videoQuality.resX, videoQuality.resY);
+				break;
+			default:
+				break;
+			}
+        	
         }
         	break;
 		default:
@@ -346,7 +424,6 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
             inputBuffer.clear();
             inputBuffer.put(inputFrame,0,inputFrame.length);
             mediaCodec.queueInputBuffer(inputBufferIndex, 0, inputFrame.length, System.nanoTime()/1000, 0);  
-			
             synchronized (mutex) {
 				mutex.notifyAll();
 		    }

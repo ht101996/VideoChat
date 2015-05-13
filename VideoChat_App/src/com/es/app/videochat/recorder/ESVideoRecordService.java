@@ -116,7 +116,7 @@ public class ESVideoRecordService implements PreviewCallback, Callback, OnEncode
 		}
 		else {
 			try {
-				ESNativeH264Encoder nativeEncoder = new ESNativeH264Encoder();
+				ESNativeH264Encoder nativeEncoder = new ESNativeH264Encoder(ImageFormat.NV21);
 				if(nativeEncoder.setupCodec(videoQuality))
 				{
 					return nativeEncoder;

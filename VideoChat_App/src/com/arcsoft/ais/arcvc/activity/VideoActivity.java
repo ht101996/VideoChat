@@ -568,7 +568,6 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 			}
 		} else if (msg.what == 2) { // video packet
 			int[] packet=msg.getData().getIntArray("packet");
-			Log.i(Global.TAG, "cxd...playing video packet length:" +packet.length);
 			Bitmap image = MyBitmap
 					.createMyBitmap(packet, msg.getData().getInt("width"), msg.getData().getInt("height"));
 			if (image != null) {

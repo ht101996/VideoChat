@@ -54,7 +54,6 @@ public class ESRecorderMgr implements OnRecordServiceListener {
 		{
 			try {
 				DatagramPacket packet=new DatagramPacket(data,length, address,5000);  
-				System.out.println("..cxd, send video data leng:"+length);
 				socket.send(packet);
 			} catch (Exception e) {
 				// TODO: handle exception
@@ -66,7 +65,6 @@ public class ESRecorderMgr implements OnRecordServiceListener {
 		{
 			try {
 				DatagramPacket packet=new DatagramPacket(data,length, address,5000);  
-				System.out.println("..cxd, send andio data leng:"+length);
 				socket.send(packet);
 			} catch (Exception e) {
 				// TODO: handle exception

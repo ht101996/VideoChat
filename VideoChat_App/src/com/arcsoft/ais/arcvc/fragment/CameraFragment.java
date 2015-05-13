@@ -20,6 +20,8 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import com.arcsoft.ais.arcvc.R;
+import com.es.app.videochat.recorder.ESNativeH264Encoder;
+import com.es.app.videochat.recorder.ESVideoQuality;
 
 public class CameraFragment extends Fragment implements PreviewCallback {
 	private final int previewFormat = ImageFormat.NV21;
@@ -31,8 +33,11 @@ public class CameraFragment extends Fragment implements PreviewCallback {
 	private Activity activity;
 	private int previewWidth;
 	private int previewHeight;
-	
 	private int previewFps;
+
+	private ESNativeH264Encoder h264Encoder;
+	private boolean isSendingData = false;
+	
 	public CameraFragment(int previewWidth, int previewHeight, int previewfps) {
 		this.previewWidth = previewWidth;
 		this.previewHeight = previewHeight;
@@ -84,7 +89,7 @@ public class CameraFragment extends Fragment implements PreviewCallback {
 	
 	@Override
 	public void onActivityCreated(Bundle savedInstanceState) {
-		// TODO Auto-generated method stub
+		initH264Encoder();
 		super.onActivityCreated(savedInstanceState);
 	}
 	
@@ -102,13 +107,11 @@ public class CameraFragment extends Fragment implements PreviewCallback {
 	
 	@Override
 	public void onDestroy() {
-		// TODO Auto-generated method stub
 		super.onDestroy();
 	}
 	
 	@Override
 	public void onDetach() {
-		// TODO Auto-generated method stub
 		super.onDetach();
 	}
 
@@ -203,8 +206,24 @@ public class CameraFragment extends Fragment implements PreviewCallback {
 
 	@Override
 	public void onPreviewFrame(byte[] data, Camera camera) {
-		// TODO Auto-generated method stub
-		
+		if(isSendingData)
+			h264Encoder.putData(data,data.length);
 	}
 	 
+	
+	public synchronized void startSendData() {
+		isSendingData = true;
+		h264Encoder.start(true);
+	}
+	
+	public synchronized void stopSendData() {
+		isSendingData = false;
+		h264Encoder.stop();
+	}
+	
+	private void initH264Encoder() {
+		h264Encoder = new ESNativeH264Encoder(previewFormat);
+		ESVideoQuality videoQuality = new ESVideoQuality(previewWidth,previewHeight,previewFps,125000);
+		h264Encoder.setupCodec(videoQuality);
+	}
 }

@@ -13,4 +13,6 @@ public class P2PClientManager {
 		//Log.i(Global.TAG, " getP2PClientInstance============" + p2pClient);
 		return p2pClient;
 	}
+	
+	
 }

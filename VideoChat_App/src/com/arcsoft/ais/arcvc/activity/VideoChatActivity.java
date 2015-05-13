@@ -8,13 +8,9 @@ import java.util.Map;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
-import android.app.Fragment;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.hardware.Camera;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Handler;
@@ -22,12 +18,9 @@ import android.os.Message;
 import android.app.FragmentTransaction;
 import android.util.Log;
 import android.view.Menu;
-import android.view.MotionEvent;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
-import android.view.View.OnTouchListener;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageView;
 import android.widget.RelativeLayout.LayoutParams;
 
@@ -54,7 +47,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	static SurfaceView surfaceView_myself;
 //	static DialogAdapter dialogAdapter;
 //	private static Camera myCamera;
-	private static MediaRecorder mMediaRecorder;
+//	private static MediaRecorder mMediaRecorder;
 	private AudioRecorderWrapper mAudioRecorderWrapper;
 //	private static MediaRecorder mMediaAudioRecorder;
 //	private static boolean usingCam = false;
@@ -64,7 +57,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	boolean isMyselfVideoZoomIn = false ;
 	static long friendUserId;
 	static ArrayList<String> friendPeerIds;
-	private Fragment cameraFragment;
+	private CameraFragment cameraFragment;
 	
 	private static AudioPlayer audioPlayer = AudioPlayer.getInstance();
 	@Override
@@ -110,6 +103,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		setTitle(getTitle()+" with "+friendNickname);
 		findViewById(R.id.startBtn).setOnClickListener(this);
 		findViewById(R.id.stopBtn).setOnClickListener(this);
+		addCameraFragment();
 	}
 	
 	@Override
@@ -127,59 +121,29 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		
 	}
 	
-	private void startChat() {
+	private void addCameraFragment() {
 		cameraFragment = new CameraFragment(320, 240, 15);
 		FragmentTransaction ft = getFragmentManager().beginTransaction();
 		ft.add(R.id.camera_fragment, cameraFragment);
 		ft.commit();
 	}
 	
+	private void startChat() {
+		if(cameraFragment != null)
+			cameraFragment.startSendData();
+	}
+	
 	private void stopChat() {
+		if(cameraFragment == null)
+			return;
+		cameraFragment.stopSendData();
 		FragmentTransaction ft = getFragmentManager().beginTransaction();
 		ft.remove(cameraFragment);
 		ft.commit();
+		cameraFragment = null;
 	}
 	
-	OnTouchListener touchListener = new OnTouchListener() {
 
-		@Override
-		public boolean onTouch(View v, MotionEvent event) {
-			if (event.getAction() == MotionEvent.ACTION_MOVE) {
-
-				// TODO Auto-gener
-				InputMethodManager imm = (InputMethodManager) getApplicationContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-				/*
-				 * // 显示或者隐藏输入法 imm.toggleSoftInput(0,
-				 * InputMethodManager.HIDE_NOT_ALWAYS);
-				 */
-				if (imm.isActive()) {
-					imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-				}
-			}
-
-			return false;
-		}
-
-	};
-
-	/** Check if this device has a camera */
-	private static boolean checkCameraHardware(Context context) {
-		Log.i(Global.TAG, "VideoActivity: Camera.getNumberOfCameras()============" + Camera.getNumberOfCameras());
-		if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)) {
-			// this device has a camera
-			return true;
-		} else {
-			// no camera on this device
-			return false;
-		}
-	}
-
-	@Override
-	protected void onStart() {
-		super.onStart();
-		Log.i(Global.TAG, "VideoActivity --------------onStart!");
-		P2PClientManager.getP2PClientInstance().addHandler(handler);
-	};
 
 	@Override
 	protected void onResume() {
@@ -193,7 +157,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		super.onPause();
 		Log.i(Global.TAG, "VideoActivity --------------onPause!");
 		P2PClientManager.getP2PClientInstance().removeHandler(handler);
-		releaseMediaRecorder();
+//		releaseMediaRecorder();
 		mAudioRecorderWrapper.releaseRecorder();
 	};
 
@@ -202,7 +166,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		super.onStop();
 		Log.i(Global.TAG, "VideoActivity --------------onStop!");
 		P2PClientManager.getP2PClientInstance().removeHandler(handler);
-		releaseMediaRecorder();
+//		releaseMediaRecorder();
 	};
 
 
@@ -236,16 +200,14 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 			e.printStackTrace();
 		}
 		SocketUtils.releaseLocalSocket();
-		releaseMediaRecorder();
+//		releaseMediaRecorder();
 		super.onDestroy();
 	}
 
 	@Override
 	public void onBackPressed() {
-		Log.i(Global.TAG, " --------------onBackPressed!");
 		super.onBackPressed();
-		releaseMediaRecorder();
-		// onDestroy();
+		finish();
 	}
 
 	@Override
@@ -286,7 +248,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 			public void run() {
 				String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST,Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_END,"End");
 				P2PClientManager.getP2PClientInstance().sendMsg(remotePeerId, message);
-				releaseMediaRecorder();
+//				releaseMediaRecorder();
 //				releaseCamera();
 				CameraUtils.setUsingCam(false) ;
 //				audioWrapper.stopRecord();
@@ -461,7 +423,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 
 				} else if(msgCode.equals(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_END)){
 					Log.i(Global.TAG, "msgCode  MSG_TYPE_VIDEO_CHATTING_REQUEST_END===="+msgCode);
-					releaseMediaRecorder();
+//					releaseMediaRecorder();
 					CameraUtils.setUsingCam(false) ;
 //					audioWrapper.stopRecord();
 				}
@@ -469,7 +431,6 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 			}
 		} else if (msg.what == 2) { // video packet
 			int[] packet=msg.getData().getIntArray("packet");
-			Log.i(Global.TAG, "cxd...playing video packet length:" +packet.length);
 			Bitmap image = MyBitmap
 					.createMyBitmap(packet, msg.getData().getInt("width"), msg.getData().getInt("height"));
 			if (image != null) {
@@ -492,23 +453,23 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		} 
 	}
 
-	private static void releaseMediaRecorder() {
-		Log.i(Global.TAG, "releaseMediaRecorder====" + "starting....");
-		if (mMediaRecorder != null) {
-			Log.i(Global.TAG, "mMediaRecorder.stop====" + "starting....");
-//			mMediaRecorder.stop();
-			mMediaRecorder.reset();
-			Log.i(Global.TAG, "mMediaRecorder.stop====" + "ended....");
-			mMediaRecorder.release();
-			mMediaRecorder = null;
-		}
-		
-		if(audioPlayer!=null)
-		{
-			Log.i(Global.TAG, "AudioDecoder.stop====" + "starting....");
-			audioPlayer.stopPlaying();
-		}
-		Log.i(Global.TAG, "releaseMediaRecorder====" + "ended....");
-	}
+//	private static void releaseMediaRecorder() {
+//		Log.i(Global.TAG, "releaseMediaRecorder====" + "starting....");
+//		if (mMediaRecorder != null) {
+//			Log.i(Global.TAG, "mMediaRecorder.stop====" + "starting....");
+////			mMediaRecorder.stop();
+//			mMediaRecorder.reset();
+//			Log.i(Global.TAG, "mMediaRecorder.stop====" + "ended....");
+//			mMediaRecorder.release();
+//			mMediaRecorder = null;
+//		}
+//		
+//		if(audioPlayer!=null)
+//		{
+//			Log.i(Global.TAG, "AudioDecoder.stop====" + "starting....");
+//			audioPlayer.stopPlaying();
+//		}
+//		Log.i(Global.TAG, "releaseMediaRecorder====" + "ended....");
+//	}
 
 }
