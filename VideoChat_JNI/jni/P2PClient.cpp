@@ -497,7 +497,7 @@ void SendH264Nalu(h264_nal_t* nalHdr, RTPSession& sess, const char* szPktType) {
 
 		memcpy(sendbuf + pos, pSendbuf, MAX_RTP_PKT_LENGTH - pos);
 		status = sess.SendPacket((void *) sendbuf, MAX_RTP_PKT_LENGTH);
-		LOGD("SendH264Nalu status: %d, buflen: %d --------File: %s, Line: %d", status, buflen, __FILE__, __LINE__);
+		LOGD("SendH264Nalu status: %d, buflen: %d, pos=%d MAX_RTP_PKT_LENGTH = %d --------File: %s, Line: %d", status, buflen, pos, MAX_RTP_PKT_LENGTH, __FILE__, __LINE__);
 
 		int restBufLen = buflen - (MAX_RTP_PKT_LENGTH - pos);
 		pSendbuf += (MAX_RTP_PKT_LENGTH - pos);

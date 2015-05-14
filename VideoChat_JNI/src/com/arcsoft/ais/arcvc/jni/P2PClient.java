@@ -1,5 +1,7 @@
 package com.arcsoft.ais.arcvc.jni;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -8,6 +10,7 @@ import com.arcsoft.ais.arcvc.utils.Global;
 
 
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
@@ -58,6 +61,32 @@ public class P2PClient {
 	
 	public native void sendAACPacket(String packetType,AACNal nalu);
 
+	
+	String outputFile = Environment.getExternalStorageDirectory().getAbsolutePath()
+			.concat(File.separator).concat("chatdump").concat(File.separator).concat("testouputstream");
+	int outputindex = 1;
+	private void output(String packetType, int nalutype, byte[] input) {
+		FileOutputStream fos;
+		try{
+			///if(input[4] == 0x65 || input[4] == 0x67 || input[4] == 0x68) {
+			fos = new FileOutputStream( new File(outputFile.concat(outputindex+"_"+packetType+"_"+nalutype+".txt")), true);
+			fos.write(input);
+			fos.flush();
+			fos.close();
+		//	}
+			outputindex ++;
+		}catch(Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public  void send264Packet2(String packetType, H264Nal nalu){
+		
+		output(packetType, nalu.getType(), nalu.getPayload());
+		
+		send264Packet(packetType, nalu);
+	}
+	
 	/**
 	 * invoked by jni, when received a msg, show on the UI
 	 * 

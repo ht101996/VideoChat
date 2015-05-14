@@ -1,8 +1,19 @@
 package com.es.app.videochat.recorder;
 
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+
+import com.arcsoft.ais.arcvc.bean.VideoConfig;
+import com.arcsoft.ais.arcvc.jni.H264Nal;
+import com.arcsoft.ais.arcvc.utils.CameraUtils;
+import com.arcsoft.ais.arcvc.utils.Global;
+import com.arcsoft.ais.arcvc.utils.P2PClientManager;
+import com.arcsoft.ais.arcvc.utils.SocketUtils;
 
 import android.graphics.ImageFormat;
 import android.media.MediaCodec;
@@ -259,15 +270,18 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 			}
 		}
 	}
-	String outputFile = Environment.getExternalStorageDirectory().getAbsolutePath().concat(File.separator).concat("testouputstream");
+	String outputFile = Environment.getExternalStorageDirectory().getAbsolutePath()
+			.concat(File.separator).concat("chatdump").concat(File.separator).concat("testouputstream");
 	int outputindex = 1;
 	private void output(byte[] input) {
 		FileOutputStream fos;
 		try{
+			///if(input[4] == 0x65 || input[4] == 0x67 || input[4] == 0x68) {
 			fos = new FileOutputStream( new File(outputFile.concat(outputindex+".txt")), true);
 			fos.write(input);
 			fos.flush();
 			fos.close();
+		//	}
 			outputindex ++;
 		}catch(Exception e) {
 			e.printStackTrace();
@@ -314,42 +328,19 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 					if(isDataReady)
 					{
 						ByteBuffer outputBuffer = outputBuffers[index];
-					    byte[] outData = new byte[bufferInfo.size];
-					    outputBuffer.get(outData);
-	
-					    if(m_info != null)
-					    {
-					        System.arraycopy(outData, 0, outputH264Frame, pos, outData.length);
-					        pos += outData.length;
-					    }
-					    else //保存pps sps 只有开始时 第一个帧里有， 保存起来后面用
-					    {
-					        ByteBuffer spsPpsBuffer = ByteBuffer.wrap(outData);
-					        if (spsPpsBuffer.getInt() == 0x00000001)
-					        {
-					            m_info = new byte[outData.length];
-					            System.arraycopy(outData, 0, m_info, 0, outData.length);
-					        }
-					        else
-					            isDataReady = false;
-					    }
+						byte[] outData = new byte[bufferInfo.size];
+						outputBuffer.get(outData);
+						boolean dataReady = sendToMediaCodec(outData);
+						if(dataReady) {
+							sendImagePacket(outData);
+						}
+						else {
+							getSPSAndPPS();
+							sendSPSAndPPSPacket();
+						}
+							
+						
 					    mediaCodec.releaseOutputBuffer(index, false);
-					    
-					    if(isDataReady)
-					    {
-						    if(outData[4] == 0x65) //key frame   编码器生成关键帧时只有 00 00 00 01 65 没有pps sps， 要加上  
-							{  
-						    	byte[] keyFrameData = new byte[pos];
-								System.arraycopy(outputH264Frame, 0, keyFrameData, 0, pos);  
-								System.arraycopy(m_info, 0,  outputH264Frame, 0, m_info.length);  
-								System.arraycopy(keyFrameData, 0,  outputH264Frame, m_info.length, pos);  
-								pos += m_info.length;  
-							}	
-						    
-//						    output(outputH264Frame);
-						    if(encoderListener != null)
-						    	encoderListener.onEncodeFinished(outputH264Frame, pos);
-					    }
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -357,6 +348,107 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 				
 			}
 		}
+	}
+	
+	byte[] h264spsBytes; 
+	byte[] h264ppsBytes;
+	private void getSPSAndPPS() {
+		if(m_info == null || m_info.length < 5)
+			return;
+		byte[] spsHeader = new byte[] {0x00, 0x00, 0x00, 0x01, 0x67};
+		byte[] ppsHeader = new byte[] {0x00, 0x00, 0x00, 0x01, 0x68};
+		byte[] buff = new byte[5];
+		int pos = 4;
+		int sspPos = 0, ppsPos = 0;
+		while(pos < m_info.length){
+			System.arraycopy(m_info, pos - 4, buff, 0, 5);
+			if(Arrays.equals(buff, spsHeader))
+				sspPos = pos;
+			if(Arrays.equals(buff, ppsHeader))
+				ppsPos = pos;
+			pos++;
+		}
+		if (sspPos > 0 && ppsPos > 0) {
+			int spsLength, ppsLength = 0;
+			if (ppsPos > sspPos) {
+				spsLength = ppsPos-sspPos-4;
+				ppsLength = m_info.length-ppsPos;
+				
+			} else {
+				spsLength = m_info.length-sspPos;
+				ppsLength = sspPos-ppsPos-4;
+			
+			}
+			h264spsBytes = new byte[spsLength];
+			h264ppsBytes = new byte[ppsLength];
+			System.arraycopy(m_info, sspPos, h264spsBytes, 0, spsLength);
+			System.arraycopy(m_info, ppsPos, h264ppsBytes, 0, ppsLength);
+		}
+	}
+	private void sendSPSAndPPSPacket() {
+		if(h264spsBytes != null &&  h264ppsBytes != null) {
+			set264Packet("sps", h264spsBytes);
+			set264Packet("pps", h264ppsBytes);
+		}
+	}
+	
+	private void sendImagePacket(byte[] outData) {
+        int h264length = outData.length;
+        byte[] naluData = Arrays.copyOfRange(outData, 0, h264length);
+        if ((naluData[0] & 0x1f) == 5) { // IDR
+        	sendSPSAndPPSPacket();
+		}
+        set264Packet("img", naluData);
+	}
+	
+	private void set264Packet(String type, byte[] naluData) {
+		H264Nal nalu = new H264Nal();
+		nalu.setType(naluData[0] & 0x1f);
+		nalu.setRefIdc((naluData[0] & 0x60) >>> 5);
+		nalu.setPayload(naluData);
+		nalu.setPayloadLength(naluData.length);
+		P2PClientManager.getP2PClientInstance().send264Packet2(type, nalu);
+	}
+	
+
+	private boolean sendToMediaCodec(byte[] outData) {
+		int pos = 0; 
+		boolean isDataReady = true;
+	  
+
+	    if(m_info != null)
+	    {
+	        System.arraycopy(outData, 0, outputH264Frame, pos, outData.length);
+	        pos += outData.length;
+	    }
+	    else //保存pps sps 只有开始时 第一个帧里有， 保存起来后面用
+	    {
+	        ByteBuffer spsPpsBuffer = ByteBuffer.wrap(outData);
+	        if (spsPpsBuffer.getInt() == 0x00000001)
+	        {
+	            m_info = new byte[outData.length];
+	            System.arraycopy(outData, 0, m_info, 0, outData.length);
+	        }
+	        else
+	            isDataReady = false;
+	    }
+	    
+	    if(isDataReady)
+	    {
+		    if(outData[4] == 0x65) //key frame   编码器生成关键帧时只有 00 00 00 01 65 没有pps sps， 要加上  
+			{  
+		    	byte[] keyFrameData = new byte[pos];
+				System.arraycopy(outputH264Frame, 0, keyFrameData, 0, pos);  
+				System.arraycopy(m_info, 0,  outputH264Frame, 0, m_info.length);  
+				System.arraycopy(keyFrameData, 0,  outputH264Frame, m_info.length, pos);  
+				pos += m_info.length;  
+			}	
+		   
+//		    output(outputH264Frame);
+		    if(encoderListener != null)
+		    	encoderListener.onEncodeFinished(outputH264Frame, pos);
+	    }
+	    return isDataReady;
 	}
 	public void dataTransefer(byte[] data)
 	{

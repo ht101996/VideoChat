@@ -265,36 +265,36 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 //		view.setLayoutParams(mParams);
 //		view.set
 	}
-	public void onEndClickEvent(View view) {
-		Log.i(Global.TAG, "onEndClickEvent>>>from peerId=======" + currentPeerId);
-		(new Thread() {
-			public void run() {
-				String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST,Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_END,"End");
-				P2PClientManager.getP2PClientInstance().sendMsg(remotePeerId, message);
-//				releaseMediaRecorder();
-//				releaseCamera();
-				CameraUtils.setUsingCam(false) ;
-//				audioWrapper.stopRecord();
-//				usingCam = false;
-			}
-		}).start();
-	}
+//	public void onEndClickEvent(View view) {
+//		Log.i(Global.TAG, "onEndClickEvent>>>from peerId=======" + currentPeerId);
+//		(new Thread() {
+//			public void run() {
+//				String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST,Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_END,"End");
+//				P2PClientManager.getP2PClientInstance().sendMsg(remotePeerId, message);
+////				releaseMediaRecorder();
+////				releaseCamera();
+//				CameraUtils.setUsingCam(false) ;
+////				audioWrapper.stopRecord();
+////				usingCam = false;
+//			}
+//		}).start();
+//	}
 
-	public void onApplyClickEvent(View view) {
-		
-		Log.i(Global.TAG, "onApplyClickEvent>>>from peerId=======" + currentPeerId);
-		Log.i(Global.TAG, "onApplyClickEvent>>>..to peerId======" + remotePeerId);
-		String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST, Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_APPLY, "Apply");
-		P2PClientManager.getP2PClientInstance().sendMsg(remotePeerId, message);
-
-		AlertDialog.Builder applyAlertDialogBuilder = new AlertDialog.Builder(VideoChatActivity.this);
-		applyAlertDialog = applyAlertDialogBuilder.setTitle("Video Chatting Request").setIcon(android.R.drawable.ic_dialog_info)
-				.setMessage("waiting for your friend to accept it ...").create();
-		applyAlertDialog.show();
-		Log.i(Global.TAG, "applyAlertDialogBuilder.show()====");
-		Log.i(Global.TAG, "onApplyClickEvent====");
-		
-	}
+//	public void onApplyClickEvent(View view) {
+//		
+//		Log.i(Global.TAG, "onApplyClickEvent>>>from peerId=======" + currentPeerId);
+//		Log.i(Global.TAG, "onApplyClickEvent>>>..to peerId======" + remotePeerId);
+//		String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST, Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_APPLY, "Apply");
+//		P2PClientManager.getP2PClientInstance().sendMsg(remotePeerId, message);
+//
+//		AlertDialog.Builder applyAlertDialogBuilder = new AlertDialog.Builder(VideoChatActivity.this);
+//		applyAlertDialog = applyAlertDialogBuilder.setTitle("Video Chatting Request").setIcon(android.R.drawable.ic_dialog_info)
+//				.setMessage("waiting for your friend to accept it ...").create();
+//		applyAlertDialog.show();
+//		Log.i(Global.TAG, "applyAlertDialogBuilder.show()====");
+//		Log.i(Global.TAG, "onApplyClickEvent====");
+//		
+//	}
 	
 
 //	@SuppressLint("NewApi")
