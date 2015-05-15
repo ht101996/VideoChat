@@ -27,6 +27,7 @@ import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceView;
+import android.view.TextureView;
 import android.view.View;
 import android.view.View.OnTouchListener;
 import android.view.inputmethod.InputMethodManager;
@@ -37,6 +38,7 @@ import android.widget.ScrollView;
 
 import com.arcsoft.ais.arcvc.R;
 import com.arcsoft.ais.arcvc.adapter.DialogAdapter;
+import com.arcsoft.ais.arcvc.jni.P2PClient.DateReceivedListener;
 import com.arcsoft.ais.arcvc.utils.CameraUtils;
 import com.arcsoft.ais.arcvc.utils.Configer;
 import com.arcsoft.ais.arcvc.utils.DensityUtil;
@@ -47,6 +49,8 @@ import com.arcsoft.ais.arcvc.utils.SocketUtils;
 import com.arcsoft.ais.arcvc.utils.audio.AudioWrapper;
 import com.arcsoft.ais.arcvc.utils.audio.receiver.AudioPlayer;
 import com.arcsoft.videochat.mediarecorder.AudioRecorderWrapper;
+import com.es.app.videochat.recorder.H264Decoder;
+import com.es.app.videochat.recorder.ESRecordListener.OnEncoderListener;
 
 
 
@@ -77,6 +81,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 	static long friendUserId;
 	static ArrayList<String> friendPeerIds;
 	private static WakeLock mWakeLock ;
+	private TextureView mPlaybackView;
 	
 	private static AudioPlayer audioPlayer = AudioPlayer.getInstance();
 	@Override
@@ -121,6 +126,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 		Log.i(Global.TAG, "P2PClient.startRTPSession() sucessfully");
 
 		P2PClientManager.getP2PClientInstance().addHandler(handler);
+		P2PClientManager.getP2PClientInstance().setDateReceivedListener(dateReceivedListener);
 
 		mScrollView = (ScrollView) findViewById(R.id.scrollContent);
 		// mScrollView.setVerticalScrollBarEnabled(false);//禁用垂直滚动条
@@ -129,6 +135,8 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 		// mScrollView.setHorizontalScrollBarEnabled(false);
 		alertDialogBuilder = new AlertDialog.Builder(VideoActivity.this);
 		audioWrapper = AudioWrapper.getInstance();
+		
+		mPlaybackView = (TextureView) findViewById(R.id.PlaybackView);
 		
 		//保持屏幕常亮 
 		PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE); 
@@ -268,6 +276,8 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 		super.onBackPressed();
 		releaseMediaRecorder();
 		releaseCamera();
+		stopDecode();
+		finish();
 		// onDestroy();
 	}
 
@@ -623,5 +633,32 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 
 		Log.i(Global.TAG, "myCamera releaseCamera====" + "ended....");
 	}
-
+	//for test
+	private H264Decoder decoder;
+	private boolean decoderStarted = false;
+	private void startDecode(Surface surface) {
+		decoder = new H264Decoder(320, 240, 15);
+		decoder.setupDecoder(surface);
+	}
+	
+	private void stopDecode(){
+		decoder.stopDecoder();
+		decoder.releaseDecoder();
+	}
+	private DateReceivedListener dateReceivedListener = new DateReceivedListener() {
+		
+		@Override
+		public void onH264DataReceived(byte[] arg0, int offset, int length) {
+			if(!decoderStarted) {
+				startChat();
+				decoderStarted = true;
+			}
+			decoder.onFrame(arg0, 0, length, 0);
+			
+		}
+	};
+	private void startChat() {
+		startDecode(new Surface(mPlaybackView.getSurfaceTexture()));
+	}
+	
 }

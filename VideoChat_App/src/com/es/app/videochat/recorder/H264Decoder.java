@@ -23,8 +23,18 @@ public class H264Decoder {
 	     MediaFormat mediaFormat = MediaFormat.createVideoFormat("video/avc", width, height);
 	     mediaCodec.configure(mediaFormat, surface, null, 0);
 	     mediaCodec.start();
+	     
 	}
-	 
+	
+	public void stopDecoder() {
+		if(mediaCodec != null)
+			mediaCodec.stop();
+	}
+	
+	public void releaseDecoder() {
+		if(mediaCodec != null)
+			mediaCodec.release();
+	}
 	public void onFrame(byte[] buf, int offset, int length, int flag) {
 		ByteBuffer[] inputBuffers = mediaCodec.getInputBuffers();
 		int inputBufferIndex = mediaCodec.dequeueInputBuffer(-1);

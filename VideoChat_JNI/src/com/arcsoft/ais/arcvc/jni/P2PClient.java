@@ -24,6 +24,10 @@ public class P2PClient {
 		System.loadLibrary("P2PClient");
 	}
 
+	public interface DateReceivedListener{
+		public void onH264DataReceived(byte[] data, int offset, int length);
+	}
+	
 	/**
 	 * init P2P interface and register callback from jni
 	 * 
@@ -80,9 +84,24 @@ public class P2PClient {
 		}
 	}
 	
+	private void output(byte[] input) {
+		FileOutputStream fos;
+		try{
+			///if(input[4] == 0x65 || input[4] == 0x67 || input[4] == 0x68) {
+			fos = new FileOutputStream( new File(outputFile.concat(outputindex + ".txt")), true);
+			fos.write(input);
+			fos.flush();
+			fos.close();
+		//	}
+			outputindex ++;
+		}catch(Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
 	public  void send264Packet2(String packetType, H264Nal nalu){
 		
-		output(packetType, nalu.getType(), nalu.getPayload());
+//		output(packetType, nalu.getType(), nalu.getPayload());
 		
 		send264Packet(packetType, nalu);
 	}
@@ -129,6 +148,17 @@ public class P2PClient {
 			handler.sendMessage(m);//Pushes a message
 			//Log.i(Global.TAG, "handler=" + handler.getClass());
 		}
+	}
+	
+	private DateReceivedListener dataListener;
+	public void setDateReceivedListener(DateReceivedListener listener) {
+		this.dataListener = listener;
+	}
+	
+	public void receiveH264Data(byte[] data, int offset, int length) {
+//		output(data);
+		if(dataListener != null)
+			dataListener.onH264DataReceived(data, offset, length);
 	}
 
 	public static void onAudioReceive(byte[] value) {

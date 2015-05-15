@@ -350,33 +350,33 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 		}
 	}
 	
-	byte[] h264spsBytes; 
-	byte[] h264ppsBytes;
+	private byte[] h264spsBytes; 
+	private byte[] h264ppsBytes;
 	private void getSPSAndPPS() {
 		if(m_info == null || m_info.length < 5)
 			return;
 		byte[] spsHeader = new byte[] {0x00, 0x00, 0x00, 0x01, 0x67};
 		byte[] ppsHeader = new byte[] {0x00, 0x00, 0x00, 0x01, 0x68};
 		byte[] buff = new byte[5];
-		int pos = 4;
+		int pos = 0;
 		int sspPos = 0, ppsPos = 0;
 		while(pos < m_info.length){
-			System.arraycopy(m_info, pos - 4, buff, 0, 5);
+			System.arraycopy(m_info, pos, buff, 0, 5);
 			if(Arrays.equals(buff, spsHeader))
 				sspPos = pos;
 			if(Arrays.equals(buff, ppsHeader))
 				ppsPos = pos;
 			pos++;
 		}
-		if (sspPos > 0 && ppsPos > 0) {
+		if (sspPos > 0 || ppsPos > 0) {
 			int spsLength, ppsLength = 0;
 			if (ppsPos > sspPos) {
-				spsLength = ppsPos-sspPos-4;
+				spsLength = ppsPos-sspPos;
 				ppsLength = m_info.length-ppsPos;
 				
 			} else {
 				spsLength = m_info.length-sspPos;
-				ppsLength = sspPos-ppsPos-4;
+				ppsLength = sspPos-ppsPos;
 			
 			}
 			h264spsBytes = new byte[spsLength];
@@ -384,7 +384,10 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 			System.arraycopy(m_info, sspPos, h264spsBytes, 0, spsLength);
 			System.arraycopy(m_info, ppsPos, h264ppsBytes, 0, ppsLength);
 		}
+		else
+			Log.e(TAG, "Found SPS PPS info failed!");
 	}
+	
 	private void sendSPSAndPPSPacket() {
 		if(h264spsBytes != null &&  h264ppsBytes != null) {
 			set264Packet("sps", h264spsBytes);

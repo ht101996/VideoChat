@@ -1,11 +1,15 @@
 package com.arcsoft.ais.arcvc.net;
 
 import com.arcsoft.ais.arcvc.jni.P2PClient;
+import com.arcsoft.ais.arcvc.jni.P2PClient.DateReceivedListener;
 import com.arcsoft.ais.arcvc.utils.SdCardUtils;
 
 public class DataTransferMgr {
+	
+	
 	private static P2PClient p2pClient = null;
 	private boolean initedSession = false;
+	
 
 	public DataTransferMgr() {
 		p2pClient = new P2PClient();
@@ -17,5 +21,9 @@ public class DataTransferMgr {
 		initedSession = false;
 	}
 	
+	public void setDateReceivedListener(DateReceivedListener listener) {
+		if(p2pClient != null)
+			p2pClient.setDateReceivedListener(listener);
+	}
 	//public void 
 }

@@ -19,7 +19,7 @@ extern "C"{
 #endif
 
 #define AUDIO_TIMESTAMP_INCREMENT ((double)(1024.0 / 8000.0))
-#define VIDEO_TIMESTAMP_INCREMENT ((double)(1.0 / 30.0)) // 29.745
+#define VIDEO_TIMESTAMP_INCREMENT ((double)(1.0 / 15.0)) // 29.745
 #define IMG_DISPLAY_INTERVAL (VIDEO_TIMESTAMP_INCREMENT * 1000000) // 25 ms 25000 30000
 #define AUDIO_PLAY_INTERVAL	 (AUDIO_TIMESTAMP_INCREMENT * 1000000) // 90 ms 90000 130000
 #define NALU_BUF_SIZE (1024*1024*2) // 2M
@@ -42,6 +42,61 @@ extern JavaVM *jvm;
 extern jobject javaObj;
 volatile double currentAudioPlayTime = 0;
 pthread_mutex_t* g_pLockTimestamp = NULL;
+
+static void notifyJNIH264DataReceived(const jbyte* data, int length) {
+	JNIEnv* jniEnv = NULL;
+	jclass clientClass = NULL;
+	jmethodID javaMethod = NULL;
+	jbyteArray resByteArr = NULL;
+	do {
+		if (!jvm || !data) {
+			LOGE("notifyJNIH264DataReceived parameter  is NULL\n");
+			break;
+		}
+		if (jvm->AttachCurrentThread(&jniEnv, NULL) != JNI_OK) {
+			LOGE("AttachCurrentThread failed.\n");
+			break;
+		}
+		if (javaObj == NULL) {
+			LOGE("javaObj is NULL.\n");
+			break;
+		}
+		clientClass = jniEnv->GetObjectClass(javaObj);
+		if (clientClass == NULL) {
+			LOGE("Get Class P2PClient failed.\n");
+			break;
+		}
+		javaMethod = jniEnv->GetMethodID(clientClass, "receiveH264Data", "([BII)V");
+		if (javaMethod == NULL) {
+			LOGE("Get method receiveH264Data .\n");
+			break;
+		}
+		resByteArr = jniEnv->NewByteArray(length);
+		if (resByteArr == NULL) {
+			LOGE("NewByteArray Out of memory, LINE: %d\n", __LINE__);
+			break;
+		}
+		LOGD("resByteArr: %p, pixArrLen: %d, len: %d", resByteArr, jniEnv->GetArrayLength(resByteArr), length);
+		jniEnv->SetByteArrayRegion(resByteArr, 0, length, data);
+		if (jniEnv->ExceptionCheck()) {
+			LOGE("SetIntArrayRegion Exception.\n");
+			jniEnv->ExceptionDescribe();
+		} else {
+			jniEnv->CallVoidMethod(javaObj, javaMethod, resByteArr, 0, length);
+		}
+	} while (false);
+	if (jniEnv) {
+		if (clientClass) {
+			jniEnv->DeleteLocalRef(clientClass);
+		}
+		if (resByteArr) {
+			jniEnv->DeleteLocalRef(resByteArr);
+		}
+	}
+	if (jvm) {
+		jvm->DetachCurrentThread();
+	}
+}
 
 static void notifyJNIShowImg(int* pixdata, int width, int height) {
 	if (!pixdata) {
@@ -687,38 +742,25 @@ void VideoRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 {
 	LOGD("VideoRTPSession ProcessRTPPacket !");
 
-//	FILE* fh264 = fopen("/mnt/sdcard/raw.h264", "ab");
-//	size_t payloadlength = rtppack.GetPayloadLength();
-//	fwrite(&payloadlength, 1, sizeof(payloadlength), fh264);
-//	fwrite(rtppack.GetPayloadData(), 1, payloadlength, fh264);
-//	fclose(fh264);
-
-	//LOGD("VideoRTPSession timestamp:%u, mark: %d, __LINE__: %d\n",rtppack.GetTimestamp(), mark, __LINE__);
 	do {
 		if (mark) {// mark的pack是完整包的最后一个pack
 			LOGD("VideoRTPSession bufLen: %d, __LINE__: %d\n", bufLen, __LINE__);
 
-			addToNaluQueue(pNaluBuf, bufLen, timestamp, sequenceNum);
+			//set h264 data by cxd
+					notifyJNIH264DataReceived((const jbyte* )pNaluBuf, bufLen);
+//			addToNaluQueue(pNaluBuf, bufLen, timestamp, sequenceNum);
 			if (isSendEnded) {
 				isSendEnded = false;
 			}
-			if (!tid_decode) {
-				pthread_create(&tid_decode, NULL, thr_decode_video, this);
-			}
+//			if (!tid_decode) {
+//				pthread_create(&tid_decode, NULL, thr_decode_video, this);
+//			}
 #if __DECODE__ == 0
 			bufLen = 0;
 #else
 			bufLen = 4;
 #endif
-//			if (NULL == pNaluBuf) {
-//				pNaluBuf = (uint8_t*)malloc(bufLen);
-//			} else {
-//				pNaluBuf = (uint8_t*)realloc(pNaluBuf, bufLen);
-//			}
-//			if (NULL == pNaluBuf) {
-//				LOGE("Not enough memory, __LINE__: %d\n", __LINE__);
-//				break;
-//			}
+
 			
 #if __DECODE__ == 1
 			// nal unit start code
@@ -731,11 +773,7 @@ void VideoRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 			nal.i_ref_idc = *rtppack.GetPayloadData();
 			nal.i_type = *(rtppack.GetPayloadData() + sizeof(int));
 			nal.i_payload = rtppack.GetPayloadLength() - 8 - RTP_PKT_HEADER_LENGTH; // add nal unit start code
-//			pNaluBuf = (uint8_t*)realloc(pNaluBuf, bufLen + len);
-//			if (NULL == pNaluBuf) {
-//				LOGE("Not enough memory, __LINE__: %d\n", __LINE__);
-//				break;
-//			}
+
 
 			nal.p_payload = rtppack.GetPayloadData() + 8 + RTP_PKT_HEADER_LENGTH;
 			if (eFrom == DEV_UNDEFINED) {
@@ -758,9 +796,6 @@ void VideoRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 				pthread_mutex_lock(g_pLockTimestamp);
 				firstTimestamp = GetAudioRTPSession()->getFirstTimestamp() ? GetAudioRTPSession()->getFirstTimestamp() : timestamp;
 				pthread_mutex_unlock(g_pLockTimestamp);
-//				firstTimestamp = timestamp;
-//				RTPTime rtptime = srcdat.SR_GetNTPTimestamp();
-//				firstNTPTimestamp = rtptime.GetDouble();
 			}
 			if (!firstSequenceNum) {
 				firstSequenceNum = sequenceNum;
@@ -768,15 +803,6 @@ void VideoRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 			timestamp = firstTimestamp + (double)(sequenceNum - firstSequenceNum) * (VIDEO_TIMESTAMP_INCREMENT);
 
 			LOGD("receive fps Timestamp:%lf, SequenceNumber:%u\n", timestamp, sequenceNum);
-//			FILE* flog = fopen("/mnt/sdcard/videorecv.log", "a");
-//			if (flog) {
-//				struct  timeval    stCurTime;
-//				gettimeofday( &stCurTime, NULL );
-//				double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
-////				double currentVideoTime = firstNTPTimestamp + ((double)rtppack.GetTimestamp() - (double)firstTimestamp)*(1.0/VIDEO_SAMPLING_RATE) ;
-//				fprintf(flog, "currentTime: %lf, firstTimestamp: %lf, Timestamp:%lf, SequenceNumber:%u\n", curtime, firstTimestamp, timestamp, sequenceNum);
-//				fclose(flog);
-//			}
 			LOGD("VideoRTPSession firstTimestamp:%lf, __LINE__: %d\n",firstTimestamp, __LINE__);
 			LOGD("VideoRTPSession  Timestamp:%lf, SequenceNumber:%u, __LINE__: %d\n", timestamp, sequenceNum, __LINE__);
 #if __DECODE__ == 0
@@ -785,20 +811,11 @@ void VideoRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 			fclose(frecv);
 #endif
 		} else {
-//			memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData(), rtppack.GetPayloadLength());
-//			bufLen +=  rtppack.GetPayloadLength();
 			size_t len = rtppack.GetPayloadLength() - RTP_PKT_HEADER_LENGTH;
-//			pNaluBuf = (uint8_t*)realloc(pNaluBuf, bufLen + len);
-//			if (NULL == pNaluBuf) {
-//				LOGE("Not enough memory, __LINE__: %d\n", __LINE__);
-//				break;
-//			}
 			LOGD("pNaluBuf:%p, bufLen:%d, len: %d, __LINE__: %d\n", pNaluBuf, bufLen, len, __LINE__);
 			memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() + RTP_PKT_HEADER_LENGTH, len);
 			bufLen += len;
 
-//			timestamp = *((double*)rtppack.GetPayloadData());
-//			sequenceNum = *((uint32_t*)(rtppack.GetPayloadData() + sizeof(double)));
 #if __DECODE__ == 0
 			FILE* frecv = fopen("/mnt/sdcard/recv.rgba", "ab");
 			fwrite(rtppack.GetPayloadData(), len, 1, frecv);
@@ -838,6 +855,10 @@ int VideoRTPSession::decodeVideoFrame()
 			qNalu->pop();
 		}
 		pthread_mutex_unlock(pLockDecode);
+
+//		//set h264 data by cxd
+//		notifyJNIH264DataReceived((const jbyte* )naluElem.data, naluElem.len);
+
 		pkt.data = naluElem.data;
 		pkt.size = naluElem.len;
 //		LOGI("decodeVideoFrame; now is doing!");

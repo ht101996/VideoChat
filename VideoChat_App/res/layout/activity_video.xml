@@ -77,6 +77,14 @@
         android:layout_alignParentRight="true"
         android:onClick="onTextClickEvent"
         android:text="Message" />
+    
+    <TextureView
+        android:id="@+id/PlaybackView"
+        android:layout_width="120dp"
+        android:layout_height="160dp"
+        android:layout_alignParentRight="true"
+         android:layout_alignParentTop="true"
+        android:layout_marginTop="25dp" />
 </RelativeLayout>
 
 </ScrollView>
