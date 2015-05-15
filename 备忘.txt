@@ -1,0 +1,3 @@
+登录：
+ /asserts/config.ini配置相关信息；
+ 会做时间戳验证
