@@ -1,7 +1,6 @@
 package com.arcsoft.ais.arcvc.jni;
 
 public class AACNal {
-
 	private int payloadLength;
 	private byte[] payload;
 
