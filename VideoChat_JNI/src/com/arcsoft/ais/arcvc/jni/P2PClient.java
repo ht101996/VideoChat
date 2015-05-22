@@ -26,6 +26,7 @@ public class P2PClient {
 
 	public interface DateReceivedListener{
 		public void onH264DataReceived(byte[] data, int offset, int length);
+		public void onAACDataReceived(byte[] data, int offset, int length);
 	}
 	
 	/**
@@ -64,40 +65,41 @@ public class P2PClient {
 	public native void send264Packet(String packetType, H264Nal nalu);
 	
 	public native void sendAACPacket(String packetType,AACNal nalu);
+	public native void sendAACESData(byte[] data, int length);
 
 	
-	String outputFile = Environment.getExternalStorageDirectory().getAbsolutePath()
-			.concat(File.separator).concat("chatdump").concat(File.separator).concat("testouputstream");
-	int outputindex = 1;
-	private void output(String packetType, int nalutype, byte[] input) {
-		FileOutputStream fos;
-		try{
-			///if(input[4] == 0x65 || input[4] == 0x67 || input[4] == 0x68) {
-			fos = new FileOutputStream( new File(outputFile.concat(outputindex+"_"+packetType+"_"+nalutype+".txt")), true);
-			fos.write(input);
-			fos.flush();
-			fos.close();
-		//	}
-			outputindex ++;
-		}catch(Exception e) {
-			e.printStackTrace();
-		}
-	}
-	
-	private void output(byte[] input) {
-		FileOutputStream fos;
-		try{
-			///if(input[4] == 0x65 || input[4] == 0x67 || input[4] == 0x68) {
-			fos = new FileOutputStream( new File(outputFile.concat(outputindex + ".txt")), true);
-			fos.write(input);
-			fos.flush();
-			fos.close();
-		//	}
-			outputindex ++;
-		}catch(Exception e) {
-			e.printStackTrace();
-		}
-	}
+//	String outputFile = Environment.getExternalStorageDirectory().getAbsolutePath()
+//			.concat(File.separator).concat("chatdump").concat(File.separator).concat("testouputstream");
+//	int outputindex = 1;
+//	private void output(String packetType, int nalutype, byte[] input) {
+//		FileOutputStream fos;
+//		try{
+//			///if(input[4] == 0x65 || input[4] == 0x67 || input[4] == 0x68) {
+//			fos = new FileOutputStream( new File(outputFile.concat(outputindex+"_"+packetType+"_"+nalutype+".txt")), true);
+//			fos.write(input);
+//			fos.flush();
+//			fos.close();
+//		//	}
+//			outputindex ++;
+//		}catch(Exception e) {
+//			e.printStackTrace();
+//		}
+//	}
+//	
+//	private void output(byte[] input) {
+//		FileOutputStream fos;
+//		try{
+//			///if(input[4] == 0x65 || input[4] == 0x67 || input[4] == 0x68) {
+//			fos = new FileOutputStream( new File(outputFile.concat(outputindex + ".txt")), true);
+//			fos.write(input);
+//			fos.flush();
+//			fos.close();
+//		//	}
+//			outputindex ++;
+//		}catch(Exception e) {
+//			e.printStackTrace();
+//		}
+//	}
 	
 	public  void send264Packet2(String packetType, H264Nal nalu){
 		
@@ -161,6 +163,12 @@ public class P2PClient {
 			dataListener.onH264DataReceived(data, offset, length);
 	}
 
+	public void receiveAACData(byte[] data, int offset, int length) {
+//		output(data);
+		if(dataListener != null)
+			dataListener.onAACDataReceived(data, offset, length);
+	}
+	
 	public static void onAudioReceive(byte[] value) {
 		Message m = new Message();
 		m.what = 5;

@@ -1,9 +1,15 @@
 package com.arcsoft.ais.arcvc.activity;
 
+import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import net.pocketmagic.android.openmxplayer.OpenMXPlayer;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -11,7 +17,13 @@ import android.app.Dialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
+import android.media.MediaCodec;
+import android.media.MediaCodecInfo;
+import android.media.MediaFormat;
 import android.media.MediaRecorder;
+import android.media.MediaRecorder.AudioSource;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -37,10 +49,12 @@ import com.arcsoft.ais.arcvc.utils.P2PClientManager;
 import com.arcsoft.ais.arcvc.utils.SocketUtils;
 import com.arcsoft.ais.arcvc.utils.audio.receiver.AudioPlayer;
 import com.arcsoft.videochat.mediarecorder.AudioRecorderWrapper;
+import com.es.app.videochat.recorder.AACDecoder;
 import com.es.app.videochat.recorder.ESRecordListener.OnEncoderListener;
 import com.es.app.videochat.recorder.H264Decoder;
 
 public class VideoChatActivity extends Activity implements View.OnClickListener{
+	private final String tag = VideoChatActivity.class.getSimpleName();
 	static String friendNickname;
 	static String currentNickname;
 	static String startCameraRecordingFlag;
@@ -63,7 +77,6 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	static ArrayList<String> friendPeerIds;
 	private CameraFragment cameraFragment;
 	private TextureView mPlaybackView;
-	
 	private static AudioPlayer audioPlayer = AudioPlayer.getInstance();
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -153,7 +166,166 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	private void startChat() {
 		if(cameraFragment != null)
 			cameraFragment.startSendData();
-		startDecode(new Surface(mPlaybackView.getSurfaceTexture()));
+		
+//		startAudioRecord();
+		startAudioRecord();
+		startDecode(new Surface(mPlaybackView.getSurfaceTexture()));//add test surface 
+	}
+	
+//	private static MediaRecorder mMediaAudioRecorder;
+//	private void startMediaRecordAudio() {
+//		mMediaAudioRecorder = CameraUtils.initAudioRecorder(mMediaAudioRecorder);
+//		try {
+//			mMediaAudioRecorder.prepare();
+//		} catch (IllegalStateException e) {
+//			e.printStackTrace();
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+//		mMediaAudioRecorder.start();
+//		CameraUtils.startAudioRecording();
+//	}
+	private int bufferSize;
+	private MediaCodec encoder;
+	private AudioRecord recorder;
+	private short audioFormat = AudioFormat.ENCODING_PCM_16BIT;
+	private short channelConfig = AudioFormat.CHANNEL_IN_MONO;
+	private boolean bSendingAudio = false;
+	private boolean setEncoder(int rate)
+    {
+        encoder = MediaCodec.createEncoderByType("audio/mp4a-latm");
+        MediaFormat format = new MediaFormat();
+        format.setString(MediaFormat.KEY_MIME, "audio/mp4a-latm");
+        format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
+        format.setInteger(MediaFormat.KEY_SAMPLE_RATE, rate);
+        format.setInteger(MediaFormat.KEY_BIT_RATE, 64 * 1024);//AAC-HE 64kbps
+        format.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectHE);
+        encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+        return true;
+    }
+    private int findAudioRecord()
+    {
+        for (int rate : new int[]{44100})
+        {
+            try
+            {
+                bufferSize = AudioRecord.getMinBufferSize(rate, channelConfig, audioFormat);
+
+                if (bufferSize != AudioRecord.ERROR_BAD_VALUE)
+                {
+                    // check if we can instantiate and have a success
+                    recorder = new AudioRecord(AudioSource.MIC, rate, channelConfig, audioFormat, bufferSize);
+
+                    if (recorder.getState() == AudioRecord.STATE_INITIALIZED)
+                    {
+                        Log.v(tag, "===========final rate :"+ rate + "Hz, bits: " + audioFormat + ", channel: " + channelConfig);
+
+                        return rate;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Log.v("error", "" + rate);
+            }
+
+        }
+        return -1;
+    }
+	private boolean startAudioRecord() {
+		findAudioRecord();
+		int rate = findAudioRecord();
+        if (rate == -1) 
+        	return false;
+        boolean encoderReady = setEncoder(rate);
+	    if (!encoderReady)
+	         return false;
+	    bSendingAudio = true;
+		Thread IOrecorder = new Thread(new Runnable()
+        {
+            public void run()
+            {
+                int read;
+                byte[] buffer1 = new byte[bufferSize];
+
+                ByteBuffer[] inputBuffers;
+                ByteBuffer[] outputBuffers;
+
+                ByteBuffer inputBuffer;
+                ByteBuffer outputBuffer;
+
+                MediaCodec.BufferInfo bufferInfo;
+                int inputBufferIndex;
+                int outputBufferIndex;
+
+                byte[] outData;
+
+//                DatagramPacket packet;
+                try
+                {
+                    encoder.start();
+                    recorder.startRecording();
+                    while (bSendingAudio)
+                    {
+                        read = recorder.read(buffer1, 0, bufferSize);
+                       // Log.d("AudioRecoder", read + " bytes read");
+                        //------------------------
+
+                        inputBuffers = encoder.getInputBuffers();
+                        outputBuffers = encoder.getOutputBuffers();
+                        inputBufferIndex = encoder.dequeueInputBuffer(-1);
+                        if (inputBufferIndex >= 0)
+                        {
+                            inputBuffer = inputBuffers[inputBufferIndex];
+                            inputBuffer.clear();
+
+                            inputBuffer.put(buffer1);
+
+                            encoder.queueInputBuffer(inputBufferIndex, 0, buffer1.length, 0, 0);
+                        }
+
+                        bufferInfo = new MediaCodec.BufferInfo();
+                        outputBufferIndex = encoder.dequeueOutputBuffer(bufferInfo, 0);
+
+
+
+                        while (outputBufferIndex >= 0)
+                        {
+                            outputBuffer = outputBuffers[outputBufferIndex];
+
+                            outputBuffer.position(bufferInfo.offset);
+                            outputBuffer.limit(bufferInfo.offset + bufferInfo.size);
+
+                            outData = new byte[bufferInfo.size];
+                            outputBuffer.get(outData);
+//                            outpuRecordRes(outData);
+                            
+                            
+                            //-------------
+//                            packet = new DatagramPacket(outData, outData.length,
+//                                    InetAddress.getByName("127.0.0.1"), localPort);
+//                            ds.send(packet);
+                            P2PClientManager.getP2PClientInstance().sendAACESData(outData, outData.length);
+                            //------------
+                          
+                            encoder.releaseOutputBuffer(outputBufferIndex, false);
+                            outputBufferIndex = encoder.dequeueOutputBuffer(bufferInfo, 0);
+
+                        }
+                        // ----------------------;
+
+                    }
+                    encoder.stop();
+                    recorder.stop();
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        });
+		IOrecorder.start();
+		return true;
 	}
 	
 	private void stopChat() {
@@ -164,6 +336,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		ft.remove(cameraFragment);
 		ft.commit();
 		cameraFragment = null;
+		bSendingAudio = false;
 	}
 	
 
@@ -181,7 +354,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		Log.i(Global.TAG, "VideoActivity --------------onPause!");
 		P2PClientManager.getP2PClientInstance().removeHandler(handler);
 //		releaseMediaRecorder();
-		mAudioRecorderWrapper.releaseRecorder();
+//		mAudioRecorderWrapper.releaseRecorder();
 	};
 
 	@Override

@@ -97,7 +97,60 @@ static void notifyJNIH264DataReceived(const jbyte* data, int length) {
 		jvm->DetachCurrentThread();
 	}
 }
-
+static void notifyJNIAACDataReceived(const jbyte* data, int length) {
+	JNIEnv* jniEnv = NULL;
+	jclass clientClass = NULL;
+	jmethodID javaMethod = NULL;
+	jbyteArray resByteArr = NULL;
+	do {
+		if (!jvm || !data) {
+			LOGE("notifyJNIAACDataReceived parameter  is NULL\n");
+			break;
+		}
+		if (jvm->AttachCurrentThread(&jniEnv, NULL) != JNI_OK) {
+			LOGE("AttachCurrentThread failed.\n");
+			break;
+		}
+		if (javaObj == NULL) {
+			LOGE("javaObj is NULL.\n");
+			break;
+		}
+		clientClass = jniEnv->GetObjectClass(javaObj);
+		if (clientClass == NULL) {
+			LOGE("Get Class P2PClient failed.\n");
+			break;
+		}
+		javaMethod = jniEnv->GetMethodID(clientClass, "receiveAACData", "([BII)V");
+		if (javaMethod == NULL) {
+			LOGE("Get method receiveH264Data .\n");
+			break;
+		}
+		resByteArr = jniEnv->NewByteArray(length);
+		if (resByteArr == NULL) {
+			LOGE("NewByteArray Out of memory, LINE: %d\n", __LINE__);
+			break;
+		}
+		LOGD("resByteArr: %p, pixArrLen: %d, len: %d", resByteArr, jniEnv->GetArrayLength(resByteArr), length);
+		jniEnv->SetByteArrayRegion(resByteArr, 0, length, data);
+		if (jniEnv->ExceptionCheck()) {
+			LOGE("SetIntArrayRegion Exception.\n");
+			jniEnv->ExceptionDescribe();
+		} else {
+			jniEnv->CallVoidMethod(javaObj, javaMethod, resByteArr, 0, length);
+		}
+	} while (false);
+	if (jniEnv) {
+		if (clientClass) {
+			jniEnv->DeleteLocalRef(clientClass);
+		}
+		if (resByteArr) {
+			jniEnv->DeleteLocalRef(resByteArr);
+		}
+	}
+	if (jvm) {
+		jvm->DetachCurrentThread();
+	}
+}
 static void notifyJNIShowImg(int* pixdata, int width, int height) {
 	if (!pixdata) {
 		LOGE("pixdata is NULL\n");
@@ -856,9 +909,6 @@ int VideoRTPSession::decodeVideoFrame()
 		}
 		pthread_mutex_unlock(pLockDecode);
 
-//		//set h264 data by cxd
-//		notifyJNIH264DataReceived((const jbyte* )naluElem.data, naluElem.len);
-
 		pkt.data = naluElem.data;
 		pkt.size = naluElem.len;
 //		LOGI("decodeVideoFrame; now is doing!");
@@ -1128,13 +1178,15 @@ void AudioRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 		if (pNaluBuf) {
 			if (bufLen > 0) {
 				LOGD("AudioRTPSession ProcessRTPPacket ....................rtppack.GetPayloadType:%d\n",rtppack.GetPayloadType());
-				addToAACQueue(pNaluBuf, bufLen, timestamp, sequenceNum);
-				if (isSendEnded) {
-					isSendEnded = false;
-				}
-				if (!tid_decode) {
-					pthread_create(&tid_decode, NULL, thr_decode_audio, this);
-				}
+				//set aac data by cxd
+									notifyJNIAACDataReceived((const jbyte* )pNaluBuf, bufLen);
+//				addToAACQueue(pNaluBuf, bufLen, timestamp, sequenceNum);
+//				if (isSendEnded) {
+//					isSendEnded = false;
+//				}
+//				if (!tid_decode) {
+//					pthread_create(&tid_decode, NULL, thr_decode_audio, this);
+//				}
 			}
 		}
 		memset(pNaluBuf, 0, bufLen);//清空缓存，为下次做准备

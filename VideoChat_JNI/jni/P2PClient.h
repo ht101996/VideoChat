@@ -63,7 +63,8 @@ JNIEXPORT void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_startRTPSession
 JNIEXPORT void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_send264Packet
   (JNIEnv *, jobject, jstring, jobject);
 
-
+JNIEXPORT void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACESData
+  (JNIEnv *, jobject, jbyteArray, jint);
 /*
  * Class:     com_arcsoft_ais_arcvc_jni_P2PClient
  * Method:    sendAACPacket

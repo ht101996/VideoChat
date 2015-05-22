@@ -624,6 +624,8 @@ static inline int getNextAACFrameOffset(uint8_t* data, int len)
 	return ret;
 }
 
+static int outputIndex = 0;
+static int outputOrgIndex = 0;
 void SendAACNalu(aac_nal_t* nalHdr, RTPSession& sess) {
 	LOGI("SendAACNalu...start");
 
@@ -634,6 +636,19 @@ void SendAACNalu(aac_nal_t* nalHdr, RTPSession& sess) {
 
 	while (nalHdr->i_payload > 0) {
 		LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
+
+		if(0){
+							char desPath[256] = { 0 };
+							sprintf(desPath, "/sdcard/chatdump/audioOutOrg_%d.txt",
+									outputOrgIndex);
+							FILE *fp = fopen(desPath, "wb"); //wb 以二进制流写
+							if (fp) {
+								fwrite(nalHdr->p_payload, 1, nalHdr->i_payload, fp);
+								fclose(fp);
+								LOGD("cxd put %s", desPath);
+							}
+							outputOrgIndex ++;
+					}
 		buflen = getNextAACFrameOffset(nalHdr->p_payload, nalHdr->i_payload);
 		if (!buflen) {
 			LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
@@ -718,8 +733,21 @@ void SendAACNalu(aac_nal_t* nalHdr, RTPSession& sess) {
 				pos += sizeof(double);
 				memcpy(sendbuf + pos, &audioSequenceNum, sizeof(uint32_t));
 				pos += sizeof(uint32_t);
-
 				memcpy(sendbuf + pos, pSendbuf, buflen);
+
+			if(0){
+				char desPath[256] = { 0 };
+					sprintf(desPath, "/sdcard/chatdump/audioOut_%d.txt",
+							outputIndex);
+					FILE *fp = fopen(desPath, "wb"); //wb 以二进制流写
+					if (fp) {
+						fwrite(pSendbuf, 1, buflen, fp);
+						fclose(fp);
+						LOGD("cxd put %s", desPath);
+					}
+					outputIndex ++;
+			}
+
 				status = sess.SendPacket((void *) sendbuf, buflen + pos);
 				LOGD("SendAACNalu status: %d, buflen: %d --------File: %s, Line: %d", status, buflen, __FILE__, __LINE__);
 			} else if (buflen > MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH) { // 分多包发送
@@ -823,4 +851,23 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACPacket
 	env->DeleteLocalRef(jpayload);
 	LOGD("sendAACPacket,end... __LINE__: %d\n" , __LINE__);
 }
+void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACESData
+  (JNIEnv *env, jobject clazz, jbyteArray data, jint length)
+{
+	if(data == NULL || length == 0)
+		return;
+	char sendbuf[MAX_RTP_PKT_LENGTH] = {0};
+	int pos = 0;
+	int packetSize = 0;
+	jboolean isCopy;
+	jbyte* pData = env->GetByteArrayElements(data, &isCopy);
+	do{
+		packetSize = (length - pos) <= MAX_RTP_PKT_LENGTH ? (length - pos) : MAX_RTP_PKT_LENGTH;
+		memcpy(sendbuf, pData + pos, packetSize);
+		int status = audioSession->SendPacket((void *) sendbuf, packetSize);
+		pos += packetSize;
+		LOGD("sendAACESData status: %d, buflen: %d --------File: %s, Line: %d", status, packetSize, __FILE__, __LINE__);
+	}while(pos < length);
 
+	env->ReleaseByteArrayElements(data, pData, 0);
+}

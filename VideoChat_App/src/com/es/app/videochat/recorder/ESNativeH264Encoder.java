@@ -111,25 +111,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
         return output;
     }
     
-    private static MediaCodecInfo selectCodec(String mimeType) {
-        int numCodecs = MediaCodecList.getCodecCount();
-        for (int i = 0; i < numCodecs; i++) {
-            MediaCodecInfo codecInfo = MediaCodecList.getCodecInfoAt(i);
-
-            if (!codecInfo.isEncoder()) {
-                continue;
-            }
-
-            String[] types = codecInfo.getSupportedTypes();
-            for (int j = 0; j < types.length; j++) {
-                if (types[j].equalsIgnoreCase(mimeType)) {
-                    return codecInfo;
-                }
-            }
-        }
-        return null;
-    }
-    
+   
     /**
      * 
      * @param imageFormat support ImageFormat.NV21 or ImageFormat.YV12.
@@ -141,24 +123,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 	public boolean setupCodec(ESVideoQuality videoQuality)
 	{
 		String mimeType = "video/avc";
-		
-//		int numCodecs = MediaCodecList.getCodecCount();
-        MediaCodecInfo codecInfo = selectCodec(mimeType);
-//        for (int i = 0; i < numCodecs && codecInfo == null; i++) {
-//            MediaCodecInfo info = MediaCodecList.getCodecInfoAt(i);
-//            if (!info.isEncoder()) {
-//                continue;
-//            }
-//            String[] types = info.getSupportedTypes();
-//            boolean found = false;
-//            for (int j = 0; j < types.length && !found; j++) {
-//                if (types[j].equals(mimeType))
-//                    found = true;
-//            }
-//            if (!found)
-//                continue;
-//            codecInfo = info;
-//        }
+        MediaCodecInfo codecInfo = MediaCodecUtils.selectCodec(mimeType);
         if(codecInfo == null) {
         	 Log.d(TAG, "Can't find media codec correspondint to MIME:" + mimeType);
         	 return false;

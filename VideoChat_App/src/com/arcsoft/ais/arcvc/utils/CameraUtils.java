@@ -2,9 +2,11 @@ package com.arcsoft.ais.arcvc.utils;
 
 import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -18,7 +20,11 @@ import android.app.Activity;
 import android.hardware.Camera;
 import android.hardware.Camera.Parameters;
 import android.hardware.Camera.Size;
+import android.media.MediaCodec;
+import android.media.MediaExtractor;
+import android.media.MediaFormat;
 import android.media.MediaRecorder;
+import android.os.Environment;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceView;
@@ -26,6 +32,7 @@ import android.view.SurfaceView;
 import com.arcsoft.ais.arcvc.bean.VideoConfig;
 import com.arcsoft.ais.arcvc.jni.AACNal;
 import com.arcsoft.ais.arcvc.jni.H264Nal;
+import com.es.app.videochat.recorder.AACDecoder;
 
 public class CameraUtils {
 
@@ -450,6 +457,8 @@ public class CameraUtils {
         }
         return result ;
     }
+    
+    static AACDecoder audioDecoder ;
 	public static void startAudioRecording() {
 		//Log.i(Global.TAG, "startVideoRecording====" + "starting....");
 		(new Thread() {
@@ -470,8 +479,10 @@ public class CameraUtils {
 //					Log.i(Global.TAG, "recording====" + "audio loop starting....");
 //					Log.i(Global.TAG, "recording====" + "audio loop usingCam...." + usingCam);
 //					Log.i(Global.TAG, "recording====" + "audio loop receiver...." + SocketUtils.getAudioReceiverSocket());
-					if (!usingCam || SocketUtils.getAudioReceiverSocket() == null)
+					if (SocketUtils.getAudioReceiverSocket() == null) {//!usingCam || 
+						Log.i(Global.TAG, "!!!!!!!!!!!!!!!!!!!!!!!!break");
 						break;
+					}
 					try {
 //						int aaclength = dis.readInt();
 						int aaclength = dis.available();
@@ -503,10 +514,21 @@ public class CameraUtils {
 //							Log.e(Global.TAG, "recording====" + "loop naluData.length==" + naluData.length);
 							continue ;
 						}
-				
+//						if(audioDecoder == null) {
+////							MediaFormat format = getFormatFromAACFile();
+//							MediaFormat format = new MediaFormat();
+//							format.setString(MediaFormat.KEY_MIME, "audio/mp4a-latm");
+//							format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
+//							format.setInteger(MediaFormat.KEY_SAMPLE_RATE, 8000);
+//							format.setInteger(MediaFormat.KEY_BIT_RATE, 125 * 1024);
+//							audioDecoder = new AACDecoder();
+//							audioDecoder.start(format);
+//						}
+//						audioDecoder.onFrame(naluData, 0, naluData.length, 0);
 						nalu.setPayload(naluData);
 						nalu.setPayloadLength(naluData.length);
 						P2PClientManager.getP2PClientInstance().sendAACPacket("", nalu);
+						
 //						Log.d(Global.TAG, "sendAACPacket, naluData.length==" + nalu.getPayloadLength());
 					} catch (Exception e) {
 						e.printStackTrace();
@@ -518,6 +540,33 @@ public class CameraUtils {
 		}).start();
 	}
 
+	private static MediaFormat getFormatFromAACFile() {
+		String sourcePath = Environment.getExternalStorageDirectory().getPath().concat(File.separator).concat("test2.m4p");
+		MediaExtractor extractor = new MediaExtractor();
+		try {
+			extractor.setDataSource(sourcePath);
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+        // Read track header
+        MediaFormat format = null;
+        try {
+        	format = extractor.getTrackFormat(0);
+	        String mime = format.getString(MediaFormat.KEY_MIME);
+	        int sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE);
+			int channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
+			// if duration is 0, we are probably playing a live stream
+			long duration = format.getLong(MediaFormat.KEY_DURATION);
+			int bitrate = format.getInteger(MediaFormat.KEY_BIT_RATE);
+			 Log.d(TAG, "Track info: mime:" + mime + " sampleRate:" + sampleRate + " channels:" + channels + " bitrate:" + bitrate + " duration:" + duration);
+        } catch (Exception e) {
+			Log.e(TAG, "Reading format parameters exception:"+e.getMessage());
+		}
+       
+       return format;
+	}
+	
 	/**
 	 * 
 	 * @param surfaceView_myself
@@ -586,12 +635,12 @@ public class CameraUtils {
 		mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
 		mMediaRecorder.setAudioChannels(1);
 		mMediaRecorder.setAudioEncodingBitRate(128000);
-		mMediaRecorder.setAudioSamplingRate(8000);//8000  44100
+		mMediaRecorder.setAudioSamplingRate(44100);//8000  44100
 
 		Log.i(Global.TAG, " --------------initMediaRecorder !SocketUtils.getReceiverSocket()==" + SocketUtils.getAudioSenderSocket());
 		Log.i(Global.TAG, " --------------initMediaRecorder !SocketUtils.getSenderSocket()==" + SocketUtils.getAudioSenderSocket());
 		mMediaRecorder.setOutputFile(SocketUtils.getAudioSenderSocket().getFileDescriptor());
-//		mMediaRecorder.setOutputFile("/sdcard/test2.aac");
+//		mMediaRecorder.setOutputFile(Environment.getExternalStorageDirectory().getPath().concat(File.separator).concat("test2.m4p"));
 		return mMediaRecorder;
 	}
 

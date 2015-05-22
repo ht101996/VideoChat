@@ -31,9 +31,9 @@ public class SocketUtils {
 				videoSenderLocalSocket = videoLocalServerSocket.accept();
 				videoSenderLocalSocket.setReceiveBufferSize(20480);
 				videoSenderLocalSocket.setSendBufferSize(20480);
-				
+			}
 				//audio 
-
+				if (audioLocalServerSocket == null) {
 				audioLocalServerSocket = new LocalServerSocket("AudioCamera");
 				
 				audioReceiverLocalSocket = new LocalSocket();

@@ -1,4 +1,4 @@
-package com.arcsoft.videochat.mediarecorder;
+ package com.arcsoft.videochat.mediarecorder;
 
 import com.arcsoft.ais.arcvc.utils.Global;
 import com.arcsoft.ais.arcvc.utils.SocketUtils;
@@ -9,7 +9,6 @@ import android.util.Log;
 
 public class AudioRecorderWrapper {
 	private MediaRecorder audiaRecorder = null;
-	
 	private String savePath;
 	
 	public boolean startRecorder(){
@@ -71,7 +70,7 @@ public class AudioRecorderWrapper {
     	audiaRecorder.setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS);
     	audiaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
     	audiaRecorder.setAudioChannels(1);
-    	audiaRecorder.setAudioEncodingBitRate(128000);
+    	audiaRecorder.setAudioEncodingBitRate(128000);//125*1024
     	audiaRecorder.setAudioSamplingRate(8000);//8000  44100
 
 		Log.i(Global.TAG, " --------------initMediaRecorder !SocketUtils.getReceiverSocket()==" + SocketUtils.getAudioSenderSocket());

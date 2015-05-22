@@ -2,6 +2,7 @@ package com.arcsoft.ais.arcvc.activity;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +17,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.hardware.Camera;
+import android.media.MediaFormat;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Handler;
@@ -49,6 +51,7 @@ import com.arcsoft.ais.arcvc.utils.SocketUtils;
 import com.arcsoft.ais.arcvc.utils.audio.AudioWrapper;
 import com.arcsoft.ais.arcvc.utils.audio.receiver.AudioPlayer;
 import com.arcsoft.videochat.mediarecorder.AudioRecorderWrapper;
+import com.es.app.videochat.recorder.AACDecoder;
 import com.es.app.videochat.recorder.H264Decoder;
 import com.es.app.videochat.recorder.ESRecordListener.OnEncoderListener;
 
@@ -433,8 +436,8 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 			CameraUtils.startVideoRecording();
 			
 //			mMediaAudioRecorder.start();
-			mAudioRecorderWrapper.startRecorder();
-			CameraUtils.startAudioRecording();
+//			mAudioRecorderWrapper.startRecorder();
+//			CameraUtils.startAudioRecording();
 			
 		} else {
 			Log.i(Global.TAG, " --------------now playing!");
@@ -634,31 +637,58 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 		Log.i(Global.TAG, "myCamera releaseCamera====" + "ended....");
 	}
 	//for test
-	private H264Decoder decoder;
-	private boolean decoderStarted = false;
+	private H264Decoder h264Decoder;
+	private boolean H264DecoderStarted = false;
+	
+	private AACDecoder aacDecoder;
+	private boolean aacDcoderStarted = false;
 	private void startDecode(Surface surface) {
-		decoder = new H264Decoder(320, 240, 15);
-		decoder.setupDecoder(surface);
+		h264Decoder = new H264Decoder(320, 240, 15);
+		h264Decoder.setupDecoder(surface);
 	}
 	
 	private void stopDecode(){
-		decoder.stopDecoder();
-		decoder.releaseDecoder();
+		h264Decoder.stopDecoder();
+		h264Decoder.releaseDecoder();
+		H264DecoderStarted = false;
 	}
 	private DateReceivedListener dateReceivedListener = new DateReceivedListener() {
 		
 		@Override
 		public void onH264DataReceived(byte[] arg0, int offset, int length) {
-			if(!decoderStarted) {
+			if(!H264DecoderStarted) {
 				startChat();
-				decoderStarted = true;
+				H264DecoderStarted = true;
 			}
-			decoder.onFrame(arg0, 0, length, 0);
-			
+			h264Decoder.onFrame(arg0, 0, length, 0);
+		}
+		@Override
+		public void onAACDataReceived(byte[] arg0, int offset, int length) {
+			if(!aacDcoderStarted) {
+				startAACDecoder();
+				aacDcoderStarted = true;
+			}
+			aacDecoder.onFrame(arg0, offset, length, 0);
 		}
 	};
 	private void startChat() {
 		startDecode(new Surface(mPlaybackView.getSurfaceTexture()));
 	}
 	
+	private void startAACDecoder() {
+//		MediaFormat format = new MediaFormat();
+//		format.setString(MediaFormat.KEY_MIME, "audio/mp4a-latm");
+//		format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
+//		format.setInteger(MediaFormat.KEY_SAMPLE_RATE, 44100);
+//		format.setInteger(MediaFormat.KEY_BIT_RATE, 125 * 1024);
+//		format.setInteger(MediaFormat.KEY_IS_ADTS, 1);
+//		byte[] bytes = new byte[]{(byte) 0x12, (byte)0x12};
+//		ByteBuffer bb = ByteBuffer.wrap(bytes);
+//		format.setByteBuffer("csd-0", bb);
+		
+		aacDecoder = new AACDecoder();
+		aacDecoder.start();
+	}
+	
+
 }
