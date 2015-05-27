@@ -1172,8 +1172,9 @@ void AudioRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 //			fclose(flog);
 //		}
 
-		size_t len = rtppack.GetPayloadLength() - RTP_PKT_HEADER_LENGTH; // add nal unit start code
-		memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() + RTP_PKT_HEADER_LENGTH, len);
+		size_t len = rtppack.GetPayloadLength();// - RTP_PKT_HEADER_LENGTH; // add nal unit start code
+		LOGD("AudioRTPSessionrtppack length:%d, bufLen=%d __LINE__: %d\n", len, bufLen, __LINE__);
+		memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() , len);
 		bufLen += len;
 		if (pNaluBuf) {
 			if (bufLen > 0) {
@@ -1193,9 +1194,9 @@ void AudioRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 		bufLen = 0;
 	} else {
 		LOGD("AudioRTPSession ProcessRTPPacket __LINE__: %d\n", __LINE__);
-		size_t len = rtppack.GetPayloadLength() - RTP_PKT_HEADER_LENGTH;
+		size_t len = rtppack.GetPayloadLength();
 		LOGD("AudioRTPSession ProcessRTPPacket pNaluBuf:%p, bufLen:%d, len: %d\n", pNaluBuf, bufLen, len);
-		memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() + RTP_PKT_HEADER_LENGTH, len);
+		memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() , len);
 		bufLen += len;
 	}
 }

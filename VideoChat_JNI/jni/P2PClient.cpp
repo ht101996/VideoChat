@@ -854,6 +854,7 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACPacket
 void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACESData
   (JNIEnv *env, jobject clazz, jbyteArray data, jint length)
 {
+	LOGD("sendAACESData start, buflen: %d --------, Line: %d", length, __LINE__);
 	if(data == NULL || length == 0)
 		return;
 	char sendbuf[MAX_RTP_PKT_LENGTH] = {0};
@@ -862,7 +863,14 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACESData
 	jboolean isCopy;
 	jbyte* pData = env->GetByteArrayElements(data, &isCopy);
 	do{
-		packetSize = (length - pos) <= MAX_RTP_PKT_LENGTH ? (length - pos) : MAX_RTP_PKT_LENGTH;
+		if((length - pos) <= MAX_RTP_PKT_LENGTH) {
+			packetSize = length - pos;
+			audioSession->SetDefaultMark(true);
+		}
+		else {
+			packetSize = MAX_RTP_PKT_LENGTH;
+			audioSession->SetDefaultMark(false);
+		}
 		memcpy(sendbuf, pData + pos, packetSize);
 		int status = audioSession->SendPacket((void *) sendbuf, packetSize);
 		pos += packetSize;

@@ -1,7 +1,6 @@
 package com.es.app.videochat.recorder;
 
-import java.io.File;
-import java.io.FileOutputStream;
+
 import java.nio.ByteBuffer;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -38,16 +37,20 @@ public class AACDecoder implements Runnable{
         format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
         format.setInteger(MediaFormat.KEY_SAMPLE_RATE, Rate);
         format.setInteger(MediaFormat.KEY_BIT_RATE, 64 * 1024);//AAC-HE 64kbps
-        format.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectHE);
+        format.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
         return format;
 	}
 	
+	private boolean usingThread = true;
 	public boolean start() {
 		if(!initDecoder() || !initPlayer())
 			return false;
 		
-		bStop = false;
-		(new Thread(this)).start();
+		if(usingThread) 
+			(new Thread(this)).start();
+		else {
+			innerStart();
+		}
 		return true;
 	}
 	
@@ -81,116 +84,63 @@ public class AACDecoder implements Runnable{
 
     }
 	
-	String outputFile = Environment.getExternalStorageDirectory().getAbsolutePath()
-			.concat(File.separator).concat("chatdump").concat(File.separator).concat("audioReceiv");
-	int outputindex = 1;
-	private void output(byte[] input) {
-		FileOutputStream fos;
-		try{
-			///if(input[4] == 0x65 || input[4] == 0x67 || input[4] == 0x68) {
-			fos = new FileOutputStream( new File(outputFile.concat(outputindex+".txt")), true);
-			fos.write(input);
-			fos.flush();
-			fos.close();
-		//	}
-			outputindex ++;
-		}catch(Exception e) {
-			e.printStackTrace();
-		}
-	}
-	
-	
-
 	@Override
 	public void run() {
-	
-		decodeAndPlay();
+		decodeAndPlayLoop();
 	}
 	
-	private void decodeAndPlay() {
+	private void decodeAndPlay(byte[] data) {
+		try
+        {
+        	Log.d(Tag," decodeAndPlay start.");
+        	if(data == null)
+        		return;
+        	
+        	ByteBuffer[] inputBuffers = mediaCodec.getInputBuffers();
+        	ByteBuffer[] outputBuffers = mediaCodec.getOutputBuffers();
+        	ByteBuffer inputBuffer, outputBuffer;
+        	byte[] outData;
+            int inputBufferIndex = mediaCodec.dequeueInputBuffer(-1);
+            Log.d(Tag,"mediaCodec input buffer index= " + inputBufferIndex+", input data length:"+data.length);
+            if (inputBufferIndex >= 0)
+            {
+            	inputBuffer = inputBuffers[inputBufferIndex];
+                inputBuffer.clear();
+                inputBuffer.put(data);
+                mediaCodec.queueInputBuffer(inputBufferIndex, 0, data.length, 0, 0);
+            }
 
-//        SocketAddress sockAddress;
-//        String address;
-//
-//        int len = 1024 * 10;
-//        byte[] buffer2 = new byte[len];
-//        DatagramPacket packet;
+            MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+            int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
 
-        byte[] data;
+            while (outputBufferIndex >= 0)
+            {
+                outputBuffer = outputBuffers[outputBufferIndex];
 
-        ByteBuffer[] inputBuffers;
-        ByteBuffer[] outputBuffers;
+                outputBuffer.position(bufferInfo.offset);
+                outputBuffer.limit(bufferInfo.offset + bufferInfo.size);
 
-        ByteBuffer inputBuffer;
-        ByteBuffer outputBuffer;
+                outData = new byte[bufferInfo.size];
+                outputBuffer.get(outData);
 
-        MediaCodec.BufferInfo bufferInfo;
-        int inputBufferIndex;
-        int outputBufferIndex;
-        byte[] outData;
+                player.write(outData, 0, outData.length);
+                mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
+                outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
+
+            }
+        }
+        catch (Exception e)
+        {
+        	e.printStackTrace();
+        }
+	}
+	
+	private void decodeAndPlayLoop() {
         try
         {
-        	player.play();
-    		mediaCodec.start();
-            while (!bStop)
-            {
-                try
-                {
-//                    packet = new DatagramPacket(buffer2, len);
-//                    ds.receive(packet);
-//                    Log.d(tag, "receive packet.length:"+len + " bytes encoded");
-//                    sockAddress = packet.getSocketAddress();
-//                    address = sockAddress.toString();
-//
-//                 //   Log.d("UDP Receiver"," received !!! from " + address);
-//
-//                    data = new byte[packet.getLength()];
-//                    System.arraycopy(packet.getData(), packet.getOffset(), data, 0, packet.getLength());
-
-                   // Log.d("UDP Receiver",  data.length + " bytes received");
-                    //===========
-                	
-                	//===
-                	
-                	data = inputByteQueue.poll();
-                	//===
-                    inputBuffers = mediaCodec.getInputBuffers();
-                    outputBuffers = mediaCodec.getOutputBuffers();
-                    inputBufferIndex = mediaCodec.dequeueInputBuffer(-1);
-                    if (inputBufferIndex >= 0)
-                    {
-                        inputBuffer = inputBuffers[inputBufferIndex];
-                        inputBuffer.clear();
-                        inputBuffer.put(data);
-                        mediaCodec.queueInputBuffer(inputBufferIndex, 0, data.length, 0, 0);
-                    }
-
-                    bufferInfo = new MediaCodec.BufferInfo();
-                    outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
-
-                    while (outputBufferIndex >= 0)
-                    {
-                        outputBuffer = outputBuffers[outputBufferIndex];
-
-                        outputBuffer.position(bufferInfo.offset);
-                        outputBuffer.limit(bufferInfo.offset + bufferInfo.size);
-
-                        outData = new byte[bufferInfo.size];
-                        outputBuffer.get(outData);
-
-                        player.write(outData, 0, outData.length);
-                        mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
-                        outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
-
-                    }
-
-                    //===========
-
-                }
-                catch (Exception e)
-                {
-                	e.printStackTrace();
-                }
+        	innerStart();
+            while (!bStop) {
+            	decodeAndPlay(inputByteQueue.poll());
             }
 
             mediaCodec.stop();
@@ -303,7 +253,7 @@ public class AACDecoder implements Runnable{
 //	}
 	
 	
-	public void stopDecoder() {
+	public void stop() {
 		if(mediaCodec != null) {
         	mediaCodec.stop();
         	mediaCodec.release();
@@ -318,13 +268,29 @@ public class AACDecoder implements Runnable{
 		  presentationTimeUs = 0; 
 		  bStop = true;
 	}
+
+	private void innerStart() {
+		if(mediaCodec != null) {
+        	mediaCodec.start();
+		}
+		
+		if(player != null) {
+			player.play();
+	    }
+		bStop = false;
+	}
 	
 	
 	private LinkedBlockingQueue<byte[]> inputByteQueue = new LinkedBlockingQueue<byte[]>(10);
 	public void onFrame(byte[] buf, int offset, int length, int flag) {
 //		output(buf);
 		try {
-			inputByteQueue.put(buf);//TODO
+			byte[] newRevData = new byte[length];
+			System.arraycopy(buf, 0, newRevData, 0, length);
+			if(usingThread)
+				inputByteQueue.put(newRevData);//TODO
+			else 
+				decodeAndPlay(newRevData);
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

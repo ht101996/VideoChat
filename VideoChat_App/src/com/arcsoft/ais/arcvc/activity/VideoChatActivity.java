@@ -1,5 +1,7 @@
 package com.arcsoft.ais.arcvc.activity;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.net.DatagramPacket;
@@ -25,6 +27,7 @@ import android.media.MediaFormat;
 import android.media.MediaRecorder;
 import android.media.MediaRecorder.AudioSource;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.app.FragmentTransaction;
@@ -192,17 +195,18 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	private short channelConfig = AudioFormat.CHANNEL_IN_MONO;
 	private boolean bSendingAudio = false;
 	private boolean setEncoder(int rate)
-    {
-        encoder = MediaCodec.createEncoderByType("audio/mp4a-latm");
-        MediaFormat format = new MediaFormat();
-        format.setString(MediaFormat.KEY_MIME, "audio/mp4a-latm");
-        format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
-        format.setInteger(MediaFormat.KEY_SAMPLE_RATE, rate);
-        format.setInteger(MediaFormat.KEY_BIT_RATE, 64 * 1024);//AAC-HE 64kbps
-        format.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectHE);
-        encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
-        return true;
-    }
+	{
+		encoder = MediaCodec.createEncoderByType("audio/mp4a-latm");
+		MediaFormat format = new MediaFormat();
+		format.setString(MediaFormat.KEY_MIME, "audio/mp4a-latm");
+		format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
+		format.setInteger(MediaFormat.KEY_SAMPLE_RATE, rate);// rate = 44100
+		format.setInteger(MediaFormat.KEY_BIT_RATE, 64 * 1024);// 64kbps
+		format.setInteger(MediaFormat.KEY_AAC_PROFILE,
+				MediaCodecInfo.CodecProfileLevel.AACObjectLC);
+		encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+		return true;
+	}
     private int findAudioRecord()
     {
         for (int rate : new int[]{44100})
@@ -232,6 +236,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
         }
         return -1;
     }
+    private String filePath = Environment.getExternalStorageDirectory().getPath().concat(File.separator).concat("sending.m4p");
 	private boolean startAudioRecord() {
 		findAudioRecord();
 		int rate = findAudioRecord();
@@ -243,6 +248,22 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	    bSendingAudio = true;
 		Thread IOrecorder = new Thread(new Runnable()
         {
+        	private void addADTStoPacket(byte[] packet, int packetLen) {
+        	    int profile = 2;  //AAC LC
+        	                      //39=MediaCodecInfo.CodecProfileLevel.AACObjectELD;
+        	    int freqIdx = 4;  //44.1KHz
+        	    int chanCfg = 1;  //CPE
+
+        	    // fill in ADTS data
+        	    packet[0] = (byte)0xFF;
+        	    packet[1] = (byte)0xF1;
+        	    packet[2] = (byte)(((profile-1)<<6) + (freqIdx<<2) +(chanCfg>>2));
+        	    packet[3] = (byte)(((chanCfg&0x3)<<6) + (packetLen>>11));
+        	    packet[4] = (byte)((packetLen&0x7FF) >> 3);
+        	    packet[5] = (byte)(((packetLen&7)<<5) + 0x1F);
+        	    packet[6] = (byte)0xFC;
+        	
+        	}
             public void run()
             {
                 int read;
@@ -260,11 +281,13 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 
                 byte[] outData;
 
-//                DatagramPacket packet;
                 try
                 {
                     encoder.start();
                     recorder.startRecording();
+                    bSendingAudio = true;
+                    File file = new File(filePath);
+                    FileOutputStream fos = new FileOutputStream(file);;
                     while (bSendingAudio)
                     {
                         read = recorder.read(buffer1, 0, bufferSize);
@@ -297,24 +320,35 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
                             outputBuffer.limit(bufferInfo.offset + bufferInfo.size);
 
                             outData = new byte[bufferInfo.size];
+
+                            if(false) {
+                            	int outPacketSize = bufferInfo.size + 7; 
+                            	byte[] data = new byte[outPacketSize];  //space for ADTS header included
+                                addADTStoPacket(data, outPacketSize);
+                                outputBuffer.get(data, 7, bufferInfo.size);
+                                outputBuffer.position(bufferInfo.offset);
+                                fos.write(data, 0, outPacketSize);
+                                System.out.println("..cxd....");
+                            }
+                            System.out.println("..cxd send to player....");
                             outputBuffer.get(outData);
-//                            outpuRecordRes(outData);
-                            
-                            
-                            //-------------
-//                            packet = new DatagramPacket(outData, outData.length,
-//                                    InetAddress.getByName("127.0.0.1"), localPort);
-//                            ds.send(packet);
                             P2PClientManager.getP2PClientInstance().sendAACESData(outData, outData.length);
-                            //------------
                           
                             encoder.releaseOutputBuffer(outputBufferIndex, false);
                             outputBufferIndex = encoder.dequeueOutputBuffer(bufferInfo, 0);
 
                         }
+                        if (outputBufferIndex == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED) 
+                        {
+                             outputBuffers = encoder.getOutputBuffers();
+                        } 
+                        else if (outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) 
+                        {
+                        }
                         // ----------------------;
 
                     }
+                    fos.close();
                     encoder.stop();
                     recorder.stop();
                 }
@@ -327,7 +361,6 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		IOrecorder.start();
 		return true;
 	}
-	
 	private void stopChat() {
 		if(cameraFragment == null)
 			return;
@@ -352,6 +385,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	protected void onPause() {
 		super.onPause();
 		Log.i(Global.TAG, "VideoActivity --------------onPause!");
+		bSendingAudio = false;
 		P2PClientManager.getP2PClientInstance().removeHandler(handler);
 //		releaseMediaRecorder();
 //		mAudioRecorderWrapper.releaseRecorder();
