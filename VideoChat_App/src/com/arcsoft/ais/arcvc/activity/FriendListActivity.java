@@ -217,11 +217,11 @@ public class FriendListActivity extends Activity {
 				}
 		        intent.putExtra("friendPeerIds", peerIdsListItem);
 		        /* 指定intent要启动的类 */
-		        intent.setClass(FriendListActivity.this, VideoActivity.class);
+		        intent.setClass(FriendListActivity.this, VideoChatActivity.class);
 		        /* 启动一个新的Activity */
 		        startActivity(intent);
 		        /* 关闭当前的Activity */
-		        //finish();
+		        finish();
 		}
 		
 	}

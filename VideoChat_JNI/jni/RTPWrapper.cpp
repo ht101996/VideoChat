@@ -1608,8 +1608,7 @@ void AVBaseRTPSession::OnPollThreadStep()
 
 void AVBaseRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat, const RTPPacket &rtppack)
 {
-	LOGD("AVBaseRTPSession::ProcessRTPPacket rtppack.GetPayloadType()= %d",rtppack.GetPayloadType());
-	LOGD("AVBaseRTPSession::ProcessRTPPacket rtppack.GetPayloadLength()= %d",rtppack.GetPayloadLength());
+	LOGD("AVBaseRTPSession::ProcessRTPPacket get Payload  Type()= %d,  length = %d",rtppack.GetPayloadType(), rtppack.GetPayloadLength());
     if (rtppack.GetPayloadType() == RTP_VIDEO_PAYLOAD_TYPE) {//96
     	if (m_videoSess) {
     		m_videoSess->ProcessRTPPacket(srcdat, rtppack);

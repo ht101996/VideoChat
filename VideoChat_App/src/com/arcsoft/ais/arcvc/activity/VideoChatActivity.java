@@ -2,16 +2,11 @@ package com.arcsoft.ais.arcvc.activity;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.net.DatagramPacket;
-import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import net.pocketmagic.android.openmxplayer.OpenMXPlayer;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -24,7 +19,6 @@ import android.media.AudioRecord;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
-import android.media.MediaRecorder;
 import android.media.MediaRecorder.AudioSource;
 import android.os.Bundle;
 import android.os.Environment;
@@ -52,7 +46,6 @@ import com.arcsoft.ais.arcvc.utils.P2PClientManager;
 import com.arcsoft.ais.arcvc.utils.SocketUtils;
 import com.arcsoft.ais.arcvc.utils.audio.receiver.AudioPlayer;
 import com.arcsoft.videochat.mediarecorder.AudioRecorderWrapper;
-import com.es.app.videochat.recorder.AACDecoder;
 import com.es.app.videochat.recorder.ESRecordListener.OnEncoderListener;
 import com.es.app.videochat.recorder.H264Decoder;
 
@@ -69,7 +62,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 //	static DialogAdapter dialogAdapter;
 //	private static Camera myCamera;
 //	private static MediaRecorder mMediaRecorder;
-	private AudioRecorderWrapper mAudioRecorderWrapper;
+//	private AudioRecorderWrapper mAudioRecorderWrapper;
 //	private static MediaRecorder mMediaAudioRecorder;
 //	private static boolean usingCam = false;
 	private static Dialog applyAlertDialog;
@@ -98,7 +91,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		
 		//保持屏幕常亮 
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-		initMediaConfig();
+//		initMediaConfig();
 		Log.i(Global.TAG, "VideoActivity: onCreate============finished!");
 	}
 
@@ -170,7 +163,6 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		if(cameraFragment != null)
 			cameraFragment.startSendData();
 		
-//		startAudioRecord();
 		startAudioRecord();
 		startDecode(new Surface(mPlaybackView.getSurfaceTexture()));//add test surface 
 	}
@@ -201,7 +193,8 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		format.setString(MediaFormat.KEY_MIME, "audio/mp4a-latm");
 		format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
 		format.setInteger(MediaFormat.KEY_SAMPLE_RATE, rate);// rate = 44100
-		format.setInteger(MediaFormat.KEY_BIT_RATE, 64 * 1024);// 64kbps
+		format.setInteger(MediaFormat.KEY_BIT_RATE, 64000);// 64kbps
+//		format.setInteger(MediaFormat.KEY_IS_ADTS, 1);//lots driver unsupported, throws IllegalStateException
 		format.setInteger(MediaFormat.KEY_AAC_PROFILE,
 				MediaCodecInfo.CodecProfileLevel.AACObjectLC);
 		encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
@@ -237,6 +230,9 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
         return -1;
     }
     private String filePath = Environment.getExternalStorageDirectory().getPath().concat(File.separator).concat("sending.m4p");
+    
+    boolean printTimeInfo = true;
+    long firstReceivedTime = 0;
 	private boolean startAudioRecord() {
 		findAudioRecord();
 		int rate = findAudioRecord();
@@ -291,8 +287,9 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
                     while (bSendingAudio)
                     {
                         read = recorder.read(buffer1, 0, bufferSize);
-                       // Log.d("AudioRecoder", read + " bytes read");
-                        //------------------------
+                        
+                        if(firstReceivedTime == 0)
+                        	firstReceivedTime = System.currentTimeMillis();
 
                         inputBuffers = encoder.getInputBuffers();
                         outputBuffers = encoder.getOutputBuffers();
@@ -305,6 +302,8 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
                             inputBuffer.put(buffer1);
 
                             encoder.queueInputBuffer(inputBufferIndex, 0, buffer1.length, 0, 0);
+                            if(printTimeInfo)
+                            	System.out.println("cxd, wait to encode dequeueInputBuffer cost :"+(System.currentTimeMillis() - firstReceivedTime));
                         }
 
                         bufferInfo = new MediaCodec.BufferInfo();
@@ -320,7 +319,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
                             outputBuffer.limit(bufferInfo.offset + bufferInfo.size);
 
                             outData = new byte[bufferInfo.size];
-
+                           
                             if(false) {
                             	int outPacketSize = bufferInfo.size + 7; 
                             	byte[] data = new byte[outPacketSize];  //space for ADTS header included
@@ -328,15 +327,19 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
                                 outputBuffer.get(data, 7, bufferInfo.size);
                                 outputBuffer.position(bufferInfo.offset);
                                 fos.write(data, 0, outPacketSize);
-                                System.out.println("..cxd....");
                             }
-                            System.out.println("..cxd send to player....");
                             outputBuffer.get(outData);
+                            if(printTimeInfo) {
+                            	System.out.println("cxd, wait to encode dequeueOutputBuffer cost :"+(System.currentTimeMillis() - firstReceivedTime));
+                            }
                             P2PClientManager.getP2PClientInstance().sendAACESData(outData, outData.length);
-                          
+                            if(printTimeInfo) {
+                            	System.out.println("cxd, wait to send AACES data cost :"+(System.currentTimeMillis() - firstReceivedTime));
+                            	printTimeInfo = false;
+                            }
                             encoder.releaseOutputBuffer(outputBufferIndex, false);
                             outputBufferIndex = encoder.dequeueOutputBuffer(bufferInfo, 0);
-
+                           
                         }
                         if (outputBufferIndex == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED) 
                         {
@@ -400,9 +403,9 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	};
 
 
-	private void initMediaConfig() {
-		mAudioRecorderWrapper = new AudioRecorderWrapper();
-	}
+//	private void initMediaConfig() {
+//		mAudioRecorderWrapper = new AudioRecorderWrapper();
+//	}
 
 //	@Override
 //	public void onClick(View v) {

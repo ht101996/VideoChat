@@ -360,7 +360,7 @@ public class LoginActivity extends Activity {
 		        /* 启动一个新的Activity */
 		        LoginActivity.this.startActivity(intent);
 		        /* 关闭当前的Activity */
-				//finish();
+				finish();
 			} else {
 				mPasswordView.setError(getString(R.string.error_incorrect_password));
 				mPasswordView.requestFocus();

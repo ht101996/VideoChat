@@ -72,7 +72,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 	static DialogAdapter dialogAdapter;
 	private static Camera myCamera;
 	private static MediaRecorder mMediaRecorder;
-	private AudioRecorderWrapper mAudioRecorderWrapper;
+//	private AudioRecorderWrapper mAudioRecorderWrapper;
 //	private static MediaRecorder mMediaAudioRecorder;
 //	private static boolean usingCam = false;
 	private static Dialog applyAlertDialog;
@@ -123,11 +123,9 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 			Log.i(Global.TAG, "friendPeerIds.get(0)>>>..." + friendPeerIds.get(0));
 		}
 		Log.i(Global.TAG, "remotePeerId>>>..." + remotePeerId);
+		
 		// startRTPSession
-		Log.i(Global.TAG, "P2PClient.startRTPSession() >>>.start..");
 		P2PClientManager.getP2PClientInstance().startRTPSession(remotePeerId);
-		Log.i(Global.TAG, "P2PClient.startRTPSession() sucessfully");
-
 		P2PClientManager.getP2PClientInstance().addHandler(handler);
 		P2PClientManager.getP2PClientInstance().setDateReceivedListener(dateReceivedListener);
 
@@ -145,7 +143,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 		PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE); 
 		mWakeLock = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP, "LOCK_TAG"); 
 		
-		initMediaConfig();
+//		initMediaConfig();
 		Log.i(Global.TAG, "VideoActivity: onCreate============finished!");
 	}
 
@@ -196,7 +194,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 		Log.i(Global.TAG, "VideoActivity --------------onResume!");
 		P2PClientManager.getP2PClientInstance().addHandler(handler);
 		if(null != mWakeLock)
-			mWakeLock.acquire(); 
+			mWakeLock.acquire();
 	};
 
 	@Override
@@ -206,11 +204,13 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 		P2PClientManager.getP2PClientInstance().removeHandler(handler);
 		releaseMediaRecorder();
 		releaseCamera();
+		stopDecode();
 		//释放屏幕常亮锁
 		if(null != mWakeLock) {
 		    mWakeLock.release();
 		}
-		mAudioRecorderWrapper.releaseRecorder();
+		
+//		mAudioRecorderWrapper.releaseRecorder();
 	};
 
 	@Override
@@ -231,9 +231,9 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 		}
     }
 
-	private void initMediaConfig() {
-		mAudioRecorderWrapper = new AudioRecorderWrapper();
-	}
+//	private void initMediaConfig() {
+//		mAudioRecorderWrapper = new AudioRecorderWrapper();
+//	}
 	class StartCameraRecording extends Thread{
 		@Override
 		public void run() {
@@ -268,18 +268,14 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 			e.printStackTrace();
 		}
 		SocketUtils.releaseLocalSocket();
-		releaseMediaRecorder();
-		releaseCamera();
 		super.onDestroy();
 	}
 
 	@Override
 	public void onBackPressed() {
 		Log.i(Global.TAG, " --------------onBackPressed!");
-		super.onBackPressed();
-		releaseMediaRecorder();
-		releaseCamera();
-		stopDecode();
+//		super.onBackPressed();
+		P2PClientManager.getP2PClientInstance().uninit();
 		finish();
 		// onDestroy();
 	}
@@ -642,23 +638,46 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 	
 	private AACDecoder aacDecoder;
 	private boolean aacDcoderStarted = false;
-	private void startDecode(Surface surface) {
-		h264Decoder = new H264Decoder(320, 240, 15);
-		h264Decoder.setupDecoder(surface);
+	private void startH264Decoder(Surface surface) {
+		if(h264Decoder == null) {
+			h264Decoder = new H264Decoder(320, 240, 15);
+			h264Decoder.setupDecoder(surface);
+		}
+		H264DecoderStarted = true;
 	}
-	
-	private void stopDecode(){
-		h264Decoder.stopDecoder();
-		h264Decoder.releaseDecoder();
+	private void stopH264Decoder() {
+		if(h264Decoder != null) {
+			h264Decoder.stopDecoder();
+			h264Decoder.releaseDecoder();
+			h264Decoder = null;
+		}
 		H264DecoderStarted = false;
+	}
+	private void startAACDecoder() {	
+		if(aacDecoder == null) {
+			aacDecoder = new AACDecoder();
+			aacDecoder.start();
+		}
+		aacDcoderStarted = true;
+	}
+	private void stopAACDecoder() {
+		if(aacDecoder != null) {
+			aacDecoder.stop();
+			aacDecoder = null;
+		}
+		aacDcoderStarted = false;
+	}
+	private void stopDecode(){
+		stopH264Decoder();
+		stopAACDecoder();
 	}
 	private DateReceivedListener dateReceivedListener = new DateReceivedListener() {
 		
 		@Override
 		public void onH264DataReceived(byte[] arg0, int offset, int length) {
 			if(!H264DecoderStarted) {
-				startChat();
-				H264DecoderStarted = true;
+				startH264Decoder(new Surface(mPlaybackView.getSurfaceTexture()));
+				
 			}
 			h264Decoder.onFrame(arg0, 0, length, 0);
 		}
@@ -666,29 +685,17 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 		public void onAACDataReceived(byte[] arg0, int offset, int length) {
 			if(!aacDcoderStarted) {
 				startAACDecoder();
-				aacDcoderStarted = true;
 			}
 			aacDecoder.onFrame(arg0, offset, length, 0);
 		}
 	};
+	
 	private void startChat() {
-		startDecode(new Surface(mPlaybackView.getSurfaceTexture()));
+		startH264Decoder(new Surface(mPlaybackView.getSurfaceTexture()));
+		startAACDecoder();
 	}
 	
-	private void startAACDecoder() {
-//		MediaFormat format = new MediaFormat();
-//		format.setString(MediaFormat.KEY_MIME, "audio/mp4a-latm");
-//		format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
-//		format.setInteger(MediaFormat.KEY_SAMPLE_RATE, 44100);
-//		format.setInteger(MediaFormat.KEY_BIT_RATE, 125 * 1024);
-//		format.setInteger(MediaFormat.KEY_IS_ADTS, 1);
-//		byte[] bytes = new byte[]{(byte) 0x12, (byte)0x12};
-//		ByteBuffer bb = ByteBuffer.wrap(bytes);
-//		format.setByteBuffer("csd-0", bb);
-		
-		aacDecoder = new AACDecoder();
-		aacDecoder.start();
-	}
+
 	
 
 }
