@@ -37,7 +37,7 @@ extern "C"{
 #define CORE_SAFEDELETE(p) if ((p) != NULL) { delete (p); (p) = NULL; }
 #define CORE_SAFEDELETEARRAY(p) if ((p) != NULL) { delete [] (p); (p) = NULL; }
 #define AUDIO_PLAY_DELAY_TIME	10000 //10ms 每播放完一帧时,需要延迟的时间 10000
-#define AUDIO_SAMPLING_RATE	8000 // 8000
+#define AUDIO_SAMPLING_RATE	44100//8000 // 8000
 #define VIDEO_SAMPLING_RATE	90000 //90000
 
 #define RTP_PKT_HEADER_LENGTH (sizeof(double) + sizeof(uint32_t))// timestamp + sequenceNum
@@ -129,9 +129,9 @@ class VideoRTPSession
 public:
 	VideoRTPSession();
 	virtual ~VideoRTPSession();
-	bool hasSendEnded() { return isSendEnded; }
-	bool isPlaying() { return m_isPlaying; }
-	void switchPlayingStatus() { m_isPlaying  = m_isPlaying ? false : true;  }
+//	bool hasSendEnded() { return isSendEnded; }
+//	bool isPlaying() { return m_isPlaying; }
+//	void switchPlayingStatus() { m_isPlaying  = m_isPlaying ? false : true;  }
 	double getFirstTimestamp() { return firstTimestamp; }
     double getFirstNTPTimestamp() { return firstNTPTimestamp; }
 	int decodeVideoFrame();
@@ -173,10 +173,10 @@ private:
     uint32_t sequenceNum;
     AudioRTPSession* m_audioSess;
     enum eRemoteDevice	 eFrom;
-    bool mark;
-    bool isSendEnded;
-    char m_incrspeedcnt;
-    bool m_isPlaying;
+//    bool mark;
+//    bool isSendEnded;
+//    char m_incrspeedcnt;
+//    bool m_isPlaying;
 };
 
 class AudioRTPSession

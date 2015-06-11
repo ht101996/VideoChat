@@ -354,13 +354,13 @@ public class CameraUtils {
 					nalu.setRefIdc((h264sps[0] & 0x60) >>> 5);
 					nalu.setPayload(h264sps);
 					nalu.setPayloadLength(h264sps.length);
-					P2PClientManager.getP2PClientInstance().send264Packet2("sps", nalu);
+					P2PClientManager.getP2PClientInstance().send264Packet("sps", nalu,0);
 //					Log.d(Global.TAG, "send264Packet, naluData.length==" + nalu.getPayloadLength());
 					nalu.setType(h264pps[0] & 0x1f);
 					nalu.setRefIdc((h264pps[0] & 0x60) >>> 5);
 					nalu.setPayload(h264pps);
 					nalu.setPayloadLength(h264pps.length);
-					P2PClientManager.getP2PClientInstance().send264Packet2("pps", nalu);
+					P2PClientManager.getP2PClientInstance().send264Packet("pps", nalu,0);
 //					P2PClientManager.getP2PClientInstance().sendAACPacket(gpid, nalu)
 //					Log.d(Global.TAG, "send264Packet, naluData.length==" + nalu.getPayloadLength());
 				} catch (Exception e) {
@@ -409,19 +409,19 @@ public class CameraUtils {
 							nalu.setRefIdc((h264sps[0] & 0x60) >>> 5);
 							nalu.setPayload(h264sps);
 							nalu.setPayloadLength(h264sps.length);
-							P2PClientManager.getP2PClientInstance().send264Packet2("sps", nalu);
+							P2PClientManager.getP2PClientInstance().send264Packet2("sps", nalu,0);
 							Log.d(Global.TAG, "send264Packet, naluData.length==" + nalu.getPayloadLength());
 							nalu.setType(h264pps[0] & 0x1f);
 							nalu.setRefIdc((h264pps[0] & 0x60) >>> 5);
 							nalu.setPayload(h264pps);
 							nalu.setPayloadLength(h264pps.length);
-							P2PClientManager.getP2PClientInstance().send264Packet2("pps", nalu);
+							P2PClientManager.getP2PClientInstance().send264Packet2("pps", nalu,0);
 						}
 						nalu.setType(naluData[0] & 0x1f);
 						nalu.setRefIdc((naluData[0] & 0x60) >>> 5);
 						nalu.setPayload(naluData);
 						nalu.setPayloadLength(naluData.length);
-						P2PClientManager.getP2PClientInstance().send264Packet2("img", nalu);
+						P2PClientManager.getP2PClientInstance().send264Packet2("img", nalu,0);
 //						Log.d(Global.TAG, "send264Packet, naluData.length==" + nalu.getPayloadLength());
 					} catch (Exception e) {
 						e.printStackTrace();

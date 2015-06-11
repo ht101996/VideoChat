@@ -17,6 +17,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.text.Editable;
@@ -217,7 +218,10 @@ public class FriendListActivity extends Activity {
 				}
 		        intent.putExtra("friendPeerIds", peerIdsListItem);
 		        /* 指定intent要启动的类 */
-		        intent.setClass(FriendListActivity.this, VideoChatActivity.class);
+		        if(android.os.Build.VERSION.SDK_INT > 20)
+		        	intent.setClass(FriendListActivity.this, VideoActivity.class);
+		        else
+		        	intent.setClass(FriendListActivity.this, VideoChatActivity.class);
 		        /* 启动一个新的Activity */
 		        startActivity(intent);
 		        /* 关闭当前的Activity */

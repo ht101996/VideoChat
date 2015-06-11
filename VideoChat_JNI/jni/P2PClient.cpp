@@ -222,8 +222,8 @@ jint JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_pausePlaying
 		isPlaying = audioSession->GetAudioRTPSession()->isPlaying();
 	}
 	if (videoSession) {
-		videoSession->GetVideoRTPSession()->switchPlayingStatus();
-		isPlaying = videoSession->GetVideoRTPSession()->isPlaying();
+//		videoSession->GetVideoRTPSession()->switchPlayingStatus();
+//		isPlaying = videoSession->GetVideoRTPSession()->isPlaying();
 	}
 	return isPlaying;
 }
@@ -373,7 +373,7 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_startRTPSession
 #ifdef _HAVE_VIDEO_
 		//videoSession
 		RTPNATTVLTransmissionParams* transparams = new RTPNATTVLTransmissionParams;
-		RTPSessionParams* sessparams = new RTPSessionParams;
+		RTPSessionParams* sessparams = new RTPSessionParams();
 		sessparams->SetOwnTimestampUnit(1.0/10.0);
 		sessparams->SetAcceptOwnPackets(true);
 		transparams->SetPortbase(VIDEO_PORT);
@@ -405,7 +405,7 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_startRTPSession
 		audioTransParams->SetPortbase(AUDIO_PORT);
 		audioTransParams->SetP2PInterface(pIClient);
 
-		RTPSessionParams* audioSessParams = new RTPSessionParams;
+		RTPSessionParams* audioSessParams = new RTPSessionParams();
 		audioSessParams->SetOwnTimestampUnit(1.0/10.0);
 		audioSessParams->SetAcceptOwnPackets(true);
 		audioSessParams->SetUsePollThread(true);
@@ -445,8 +445,8 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_startRTPSession
 	 }
 }
 
-void SendH264Nalu(h264_nal_t* nalHdr, RTPSession& sess, const char* szPktType) {
-	LOGI("SendH264Nalu !start");
+void SendH264Nalu2(h264_nal_t* nalHdr, RTPSession& sess, const char* szPktType, jlong timestamp) {
+	LOGI("SendH264Nalu   start !! szPktType=%s data length : %d", szPktType, nalHdr->i_payload );
 	unsigned char *pSendbuf = nalHdr->p_payload; //发送数据指针
 	int buflen = nalHdr->i_payload;
 
@@ -458,13 +458,13 @@ void SendH264Nalu(h264_nal_t* nalHdr, RTPSession& sess, const char* szPktType) {
 	memcpy(sendbuf + pos, &nalHdr->i_type, sizeof(int));
 	pos += sizeof(int);
 
-	struct  timeval    stCurTime;
-	gettimeofday( &stCurTime, NULL );
-	double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
+//	struct  timeval    stCurTime;
+//	gettimeofday( &stCurTime, NULL );
+//	double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
+	double curtime = (double)timestamp / 1000000;
 
 	if (!strcmp(szPktType, "img")) {
 		++videoSequenceNum;
-		LOGD("Send fps: %lf, currentTime: %lf, SequenceNumber: %u\n",(videoSequenceNum/curtime), curtime, videoSequenceNum);
 //		FILE* flog = fopen("/mnt/sdcard/videoSend.log", "a");
 //		if (flog) {
 //			fprintf(flog, "SendH264Nalu currentTime: %lf, SequenceNumber: %u\n", curtime, videoSequenceNum);
@@ -484,7 +484,7 @@ void SendH264Nalu(h264_nal_t* nalHdr, RTPSession& sess, const char* szPktType) {
 
 		memcpy(sendbuf + pos, pSendbuf, buflen);
 		status = sess.SendPacket((void *) sendbuf, buflen + pos);
-		LOGD("SendH264Nalu status: %d, buflen: %d --------File: %s, Line: %d", status, buflen, __FILE__, __LINE__);
+		LOGD("SendH264Nalu Mark=true, szPktType: %s, curtime: %lf, videoSequenceNum:%d, length=%d", szPktType, curtime, videoSequenceNum, buflen);
 	} else if (buflen > MAX_RTP_PKT_LENGTH - pos - RTP_PKT_HEADER_LENGTH) { // 分多包发送
 		//设置标志位Mark为0
 		sess.SetDefaultMark(false);
@@ -497,7 +497,7 @@ void SendH264Nalu(h264_nal_t* nalHdr, RTPSession& sess, const char* szPktType) {
 
 		memcpy(sendbuf + pos, pSendbuf, MAX_RTP_PKT_LENGTH - pos);
 		status = sess.SendPacket((void *) sendbuf, MAX_RTP_PKT_LENGTH);
-		LOGD("SendH264Nalu status: %d, buflen: %d, pos=%d MAX_RTP_PKT_LENGTH = %d --------File: %s, Line: %d", status, buflen, pos, MAX_RTP_PKT_LENGTH, __FILE__, __LINE__);
+		LOGD("SendH264Nalu Mark=false, szPktType: %s  curtime: %lf, videoSequenceNum=%d  ---", szPktType, curtime, videoSequenceNum);
 
 		int restBufLen = buflen - (MAX_RTP_PKT_LENGTH - pos);
 		pSendbuf += (MAX_RTP_PKT_LENGTH - pos);
@@ -535,6 +535,53 @@ void SendH264Nalu(h264_nal_t* nalHdr, RTPSession& sess, const char* szPktType) {
 	} else {
 		LOGI("I'm not ready for video, sorry!!!buflen: %d\n", buflen);
 	}
+}
+
+static void SendH264Data(unsigned char *pSendbuf, int length, const char* szPktType, jlong timestamp) {
+	LOGI("sendH264Data   start !! szPktType=%s data length : %d, timestamp :%lld",
+			szPktType, length,  timestamp);
+//	unsigned char *pSendbuf = nalHdr->p_payload; //发送数据指针
+//	int length = nalHdr->i_payload;
+	char sendbuf[MAX_RTP_PKT_LENGTH] = {0};
+
+	int pos = 0, packetSize = 0, srcPos = 0, desPos = 0;
+
+
+	double curtime = (double)timestamp / 1000000;
+	bool flag = false;
+	if (!strcmp(szPktType, "img")) {
+		++videoSequenceNum;
+	}
+
+	do {
+		if((length - srcPos) <= MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH) {
+			packetSize = length - srcPos + RTP_PKT_HEADER_LENGTH;
+			videoSession->SetDefaultMark(true);
+			flag = true;
+		}
+		else {
+			packetSize = MAX_RTP_PKT_LENGTH;
+			videoSession->SetDefaultMark(false);
+			flag = false;
+		}
+		memcpy(sendbuf + desPos, &curtime, sizeof(double));
+		desPos += sizeof(double);
+
+		//add sequence number
+		memcpy(sendbuf + desPos, &videoSequenceNum, sizeof(uint32_t));
+		desPos += sizeof(uint32_t);
+
+		//set H264 data
+		memcpy(sendbuf + desPos, pSendbuf + srcPos, packetSize - RTP_PKT_HEADER_LENGTH);
+		int status =  videoSession->SendPacket((void *) sendbuf, packetSize);
+		srcPos += packetSize - RTP_PKT_HEADER_LENGTH;
+		LOGD("sendH264Data status: %d, buflen: %d, Mark = %d, Line: %d", status, packetSize, flag, __LINE__);
+
+		memset(sendbuf, 0, sizeof(char) * MAX_RTP_PKT_LENGTH);
+		desPos = 0;
+
+
+	}while(srcPos < length);
 }
 
 int GetJniObjectReferenceForH264(JNIEnv *env, jobject jo, jobject odata, h264_nal_t& h264nal, jbyteArray* outPayload) {
@@ -581,13 +628,13 @@ int GetJniObjectReferenceForH264(JNIEnv *env, jobject jo, jobject odata, h264_na
 }
 
 void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_send264Packet
-  (JNIEnv * env, jobject clazz, jstring jstring, jobject nal)
+  (JNIEnv * env, jobject clazz, jstring jstring, jobject nal, jlong timestamp)
 {
 	h264_nal_t h264nal;
 	jbyteArray jpayload;
 	GetJniObjectReferenceForH264(env, clazz, nal, h264nal, &jpayload);
 	const char *szPktType = (const char *)env->GetStringUTFChars(jstring, 0);
-	SendH264Nalu(&h264nal, *videoSession, szPktType);
+	SendH264Data(h264nal.p_payload, h264nal.i_payload, szPktType, timestamp);
 	env->ReleaseStringUTFChars(jstring, szPktType);
 	LOGD("destination gpid: %s, send264Packet, __LINE__: %d\n" , g_destGPID, __LINE__);
 	env->ReleaseByteArrayElements(jpayload, (jbyte*)h264nal.p_payload, 0);
@@ -852,30 +899,50 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACPacket
 	LOGD("sendAACPacket,end... __LINE__: %d\n" , __LINE__);
 }
 void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACESData
-  (JNIEnv *env, jobject clazz, jbyteArray data, jint length)
+  (JNIEnv *env, jobject clazz, jbyteArray data, jint length, jlong timestamp)
 {
 	LOGD("sendAACESData start, buflen: %d --------, Line: %d", length, __LINE__);
 	if(data == NULL || length == 0)
 		return;
 	char sendbuf[MAX_RTP_PKT_LENGTH] = {0};
-	int pos = 0;
+	int srcPos = 0, desPos = 0;
 	int packetSize = 0;
 	jboolean isCopy;
 	jbyte* pData = env->GetByteArrayElements(data, &isCopy);
+	bool flag = false;
 	do{
-		if((length - pos) <= MAX_RTP_PKT_LENGTH) {
-			packetSize = length - pos;
+		if((length - srcPos) <= MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH) {
+			packetSize = length - srcPos + RTP_PKT_HEADER_LENGTH;
 			audioSession->SetDefaultMark(true);
+			flag = true;
 		}
 		else {
 			packetSize = MAX_RTP_PKT_LENGTH;
 			audioSession->SetDefaultMark(false);
+			flag = false;
 		}
-		memcpy(sendbuf, pData + pos, packetSize);
+		//add time stamp
+//		struct  timeval stCurTime;
+//		gettimeofday( &stCurTime, NULL);
+//		double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
+		double curtime = (double) timestamp / 1000000;
+		memcpy(sendbuf + desPos, &curtime, sizeof(double));
+		desPos += sizeof(double);
+
+		//add sequence number
+		++ audioSequenceNum;
+		memcpy(sendbuf + desPos, &audioSequenceNum, sizeof(uint32_t));
+		desPos += sizeof(uint32_t);
+
+		//set audio AAC ES data
+		memcpy(sendbuf + desPos, pData + srcPos, packetSize - RTP_PKT_HEADER_LENGTH);
 		int status = audioSession->SendPacket((void *) sendbuf, packetSize);
-		pos += packetSize;
-		LOGD("sendAACESData status: %d, buflen: %d --------File: %s, Line: %d", status, packetSize, __FILE__, __LINE__);
-	}while(pos < length);
+		srcPos += packetSize - RTP_PKT_HEADER_LENGTH;
+		LOGD("sendAACESData status: %d, buflen: %d, Mark = %d, Line: %d", status, packetSize, flag, __LINE__);
+
+		memset(sendbuf, 0, sizeof(char) * MAX_RTP_PKT_LENGTH);
+		desPos = 0;
+	}while(srcPos < length);
 
 	env->ReleaseByteArrayElements(data, pData, 0);
 }

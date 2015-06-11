@@ -275,12 +275,15 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 					{
 						index = mediaCodec.dequeueOutputBuffer(bufferInfo, 100000);
 						if (index>=0 ){
-							
+							System.out.println("<--cxd, encode video presentationTimeUs:"+(float)bufferInfo.presentationTimeUs / 1000000);
+							TimeMonitor.videoEncodePresentationTimeUs = bufferInfo.presentationTimeUs;
 							isDataReady = true;
 							break;
 						} else if (index == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED) {
 							outputBuffers = mediaCodec.getOutputBuffers();
 						} else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+//							MediaMuxerWrapper.setVideoTrack(mediaCodec.getOutputFormat());
+//							MediaMuxerWrapper.start();
 						} else if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
 							isDataReady = false;
 							break;
@@ -293,11 +296,12 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 					if(isDataReady)
 					{
 						ByteBuffer outputBuffer = outputBuffers[index];
+//						MediaMuxerWrapper.setVideoData(outputBuffer, bufferInfo);
 						byte[] outData = new byte[bufferInfo.size];
 						outputBuffer.get(outData);
 						boolean dataReady = sendToMediaCodec(outData);
 						if(dataReady) {
-							sendImagePacket(outData);
+							sendImagePacket(outData, bufferInfo.presentationTimeUs);//TODO outData->outputH264Frame
 						}
 						else {
 							getSPSAndPPS();
@@ -355,27 +359,27 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 	
 	private void sendSPSAndPPSPacket() {
 		if(h264spsBytes != null &&  h264ppsBytes != null) {
-			set264Packet("sps", h264spsBytes);
-			set264Packet("pps", h264ppsBytes);
+			set264Packet("sps", h264spsBytes, 0);
+			set264Packet("pps", h264ppsBytes, 0);
 		}
 	}
 	
-	private void sendImagePacket(byte[] outData) {
+	private void sendImagePacket(byte[] outData, long timestamp) {
         int h264length = outData.length;
         byte[] naluData = Arrays.copyOfRange(outData, 0, h264length);
         if ((naluData[0] & 0x1f) == 5) { // IDR
         	sendSPSAndPPSPacket();
 		}
-        set264Packet("img", naluData);
+        set264Packet("img", naluData, timestamp);
 	}
 	
-	private void set264Packet(String type, byte[] naluData) {
+	private void set264Packet(String type, byte[] naluData, long timestamp) {
 		H264Nal nalu = new H264Nal();
 		nalu.setType(naluData[0] & 0x1f);
 		nalu.setRefIdc((naluData[0] & 0x60) >>> 5);
 		nalu.setPayload(naluData);
 		nalu.setPayloadLength(naluData.length);
-		P2PClientManager.getP2PClientInstance().send264Packet2(type, nalu);
+		P2PClientManager.getP2PClientInstance().send264Packet2(type, nalu, timestamp);
 	}
 	
 
@@ -410,6 +414,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 				System.arraycopy(m_info, 0,  outputH264Frame, 0, m_info.length);  
 				System.arraycopy(keyFrameData, 0,  outputH264Frame, m_info.length, pos);  
 				pos += m_info.length;  
+				System.out.println("----->cxd, add pps sps to key frame");
 			}	
 		   
 //		    output(outputH264Frame);
@@ -436,7 +441,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 			}
 		}
 			break;
-		case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar://
+		case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar://using
         case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar:
         case MediaCodecInfo.CodecCapabilities.COLOR_TI_FormatYUV420PackedSemiPlanar:
         {
@@ -459,13 +464,19 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 		}
 		}
 	}
+	private boolean printTimeInfo = true;
 	@Override
-	public void putData(byte[] data,int length) {
+	public void putData(VideoFrameItem videoFrame) {
+		 if(printTimeInfo) {
+			 printTimeInfo = false;
+         	System.out.println("---cxd, video firstReceivedTime :"+System.currentTimeMillis());
+         }
 		if(mediaCodec != null)
 		{
-			dataTransefer(data);
+			byte[] data =videoFrame.getDataBytes();
+			int length = data.length;
+			dataTransefer(data);//TODO should more efficient
 			byte[] rotateData = rotateYUV420Degree90(inputFrame,videoQuality.resX,videoQuality.resY);
-//
 			System.arraycopy(rotateData, 0, inputFrame, 0, length);
 			
 			if(null == mutex)

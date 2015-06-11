@@ -13,17 +13,17 @@ import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.util.Log;
 
-public class AACDecoder implements Runnable{
+public class AACDecoder extends AudioDecoderBase implements Runnable{
 	private final String Tag = AACDecoder.class.getSimpleName();
 	private final String mimeType = "audio/mp4a-latm";
-	private final int Rate = 44100;
+	private final int Rate = 44100;//8000;//
 	
 	private AudioTrack player;
 	private MediaCodec audioCodec;  
 	private short audioFormat = AudioFormat.ENCODING_PCM_16BIT;
     private short channelConfig = AudioFormat.CHANNEL_IN_MONO;
 	
-	long firstReceivedTime = 0;
+//	long firstReceivedTime = 0;
 	boolean bStop = true;
 	  
 	public AACDecoder() {
@@ -35,12 +35,12 @@ public class AACDecoder implements Runnable{
         format.setString(MediaFormat.KEY_MIME, "audio/mp4a-latm");
         format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
         format.setInteger(MediaFormat.KEY_SAMPLE_RATE, Rate);
-        format.setInteger(MediaFormat.KEY_BIT_RATE, 64000);//AAC-HE 64kbps
+        format.setInteger(MediaFormat.KEY_BIT_RATE, Rate * 16);
         format.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
         return format;
 	}
 	
-	private boolean usingThread = true;
+	private boolean usingThread = false;
 	public boolean start() {
 		if(!initDecoder() || !initPlayer())
 			return false;
@@ -63,11 +63,10 @@ public class AACDecoder implements Runnable{
     private boolean initPlayer()
     {
         int bufferSizePlayer = AudioTrack.getMinBufferSize(Rate, AudioFormat.CHANNEL_OUT_MONO, audioFormat);
+        
         Log.d("====buffer Size player ", String.valueOf(bufferSizePlayer));
 
         player = new AudioTrack(AudioManager.STREAM_MUSIC, Rate, AudioFormat.CHANNEL_OUT_MONO, audioFormat, bufferSizePlayer, AudioTrack.MODE_STREAM);
-
-
         if (player.getState() == AudioTrack.STATE_INITIALIZED)
         {
 
@@ -85,7 +84,7 @@ public class AACDecoder implements Runnable{
 		try
         {
             while (!bStop) {
-            	decodeAndPlay(inputByteQueue.poll());
+//            	decodeAndPlay(inputByteQueue.poll());
             }
         }
         catch (Exception e)
@@ -93,8 +92,7 @@ public class AACDecoder implements Runnable{
         	e.printStackTrace();
         }
 	}
-	boolean printFirstTime = true;
-	private void decodeAndPlay(byte[] data) {
+	private void decodeAndPlay(byte[] data, long presentationTimeUs) {
 		try
         {
 //        	Log.d(Tag," decodeAndPlay start.");
@@ -112,10 +110,7 @@ public class AACDecoder implements Runnable{
             	inputBuffer = inputBuffers[inputBufferIndex];
                 inputBuffer.clear();
                 inputBuffer.put(data);
-                long time = System.currentTimeMillis();
-                audioCodec.queueInputBuffer(inputBufferIndex, 0, data.length, 0, 0);
-                if(printFirstTime)
-                	System.out.println("cxd, wait to first dequeque input cost time 1:" + (time - firstReceivedTime));
+                audioCodec.queueInputBuffer(inputBufferIndex, 0, data.length, presentationTimeUs, 0);
             }
 
             MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
@@ -123,6 +118,10 @@ public class AACDecoder implements Runnable{
 
             while (outputBufferIndex >= 0)
             {
+//            	TimeMonitor.audioDecodePresentationTimeUs = bufferInfo.presentationTimeUs;
+//            	TimeMonitor.printDecodeInterval();
+            	System.out.println("<--cxd, decode audio in java presentationTimeUs:"+(float)bufferInfo.presentationTimeUs/1000000 );
+            	
                 outputBuffer = outputBuffers[outputBufferIndex];
 
                 outputBuffer.position(bufferInfo.offset);
@@ -130,13 +129,7 @@ public class AACDecoder implements Runnable{
 
                 outData = new byte[bufferInfo.size];
                 outputBuffer.get(outData);
-                if(printFirstTime)
-                	System.out.println("cxd, wait to first dequeueOutputBuffer input cost time 2:" + (System.currentTimeMillis() - firstReceivedTime));
                 player.write(outData, 0, outData.length);
-                if(printFirstTime) {
-                	System.out.println("cxd, wait to first write to play input cost time 3:" + (System.currentTimeMillis() - firstReceivedTime));
-                	printFirstTime = false;
-                }
                 audioCodec.releaseOutputBuffer(outputBufferIndex, false);
                 outputBufferIndex = audioCodec.dequeueOutputBuffer(bufferInfo, 0);
 
@@ -291,40 +284,42 @@ public class AACDecoder implements Runnable{
 	}
 	
 	
-	private LinkedBlockingQueue<byte[]> inputByteQueue = new LinkedBlockingQueue<byte[]>(10);
-	public void onFrame(byte[] buf, int offset, int length, int flag) {
-//		output(buf);
-		try {
-			if(firstReceivedTime == 0) {
-				firstReceivedTime = System.currentTimeMillis();
-			}
-			byte[] newRevData = new byte[length];
-			System.arraycopy(buf, 0, newRevData, 0, length);
-			if(usingThread)
-				inputByteQueue.put(newRevData);//TODO
-			else 
-				decodeAndPlay(newRevData);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		  
-//		ByteBuffer[] inputBuffers = mediaCodec.getInputBuffers();
-//		int inputBufferIndex = mediaCodec.dequeueInputBuffer(-1);
-//		if (inputBufferIndex >= 0) {
-//			ByteBuffer inputBuffer = inputBuffers[inputBufferIndex];
-//			inputBuffer.clear();
-//			inputBuffer.put(buf, offset, length);
-//			mediaCodec.queueInputBuffer(inputBufferIndex, 0, length,
-//					mCount * 1000000 / 8000, 0);
-//			mCount++;
+//	private LinkedBlockingQueue<byte[]> inputByteQueue = new LinkedBlockingQueue<byte[]>(10);
+//	public void onFrame(byte[] buf, int offset, int length, double timestamp) {
+////		output(buf);
+//		try {
+//			byte[] newRevData = new byte[length];
+//			System.arraycopy(buf, 0, newRevData, 0, length);
+//			if(usingThread)
+//				inputByteQueue.put(newRevData);//TODO
+//			else 
+//				decodeAndPlay(newRevData);
+//		} catch (InterruptedException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
 //		}
-//
-//		MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
-//		int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
-//		while (outputBufferIndex >= 0) {
-//			mediaCodec.releaseOutputBuffer(outputBufferIndex, true);
-//			outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
-//		}
+//		  
+////		ByteBuffer[] inputBuffers = mediaCodec.getInputBuffers();
+////		int inputBufferIndex = mediaCodec.dequeueInputBuffer(-1);
+////		if (inputBufferIndex >= 0) {
+////			ByteBuffer inputBuffer = inputBuffers[inputBufferIndex];
+////			inputBuffer.clear();
+////			inputBuffer.put(buf, offset, length);
+////			mediaCodec.queueInputBuffer(inputBufferIndex, 0, length,
+////					mCount * 1000000 / 8000, 0);
+////			mCount++;
+////		}
+////
+////		MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+////		int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
+////		while (outputBufferIndex >= 0) {
+////			mediaCodec.releaseOutputBuffer(outputBufferIndex, true);
+////			outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
+////		}
+//	}
+
+	@Override
+	public void decode(byte[] data, long timestamp) {
+		decodeAndPlay(data, timestamp);		
 	}
 }

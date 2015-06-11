@@ -54,6 +54,8 @@ import com.arcsoft.videochat.mediarecorder.AudioRecorderWrapper;
 import com.es.app.videochat.recorder.AACDecoder;
 import com.es.app.videochat.recorder.H264Decoder;
 import com.es.app.videochat.recorder.ESRecordListener.OnEncoderListener;
+import com.es.app.videochat.recorder.MediaDataCenter;
+import com.es.app.videochat.recorder.VideoFrameItem;
 
 
 
@@ -85,6 +87,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 	static ArrayList<String> friendPeerIds;
 	private static WakeLock mWakeLock ;
 	private TextureView mPlaybackView;
+	private MediaDataCenter mMediaDataCenter;
 	
 	private static AudioPlayer audioPlayer = AudioPlayer.getInstance();
 	@Override
@@ -123,6 +126,8 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 			Log.i(Global.TAG, "friendPeerIds.get(0)>>>..." + friendPeerIds.get(0));
 		}
 		Log.i(Global.TAG, "remotePeerId>>>..." + remotePeerId);
+		
+		initDecoders();
 		
 		// startRTPSession
 		P2PClientManager.getP2PClientInstance().startRTPSession(remotePeerId);
@@ -638,11 +643,15 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 	
 	private AACDecoder aacDecoder;
 	private boolean aacDcoderStarted = false;
+	
+	private void initDecoders() {
+		h264Decoder = new H264Decoder(320, 240, 15);
+		aacDecoder = new AACDecoder();
+		mMediaDataCenter = MediaDataCenter.getInstance(aacDecoder, h264Decoder);
+	}
 	private void startH264Decoder(Surface surface) {
-		if(h264Decoder == null) {
-			h264Decoder = new H264Decoder(320, 240, 15);
+		if(!H264DecoderStarted) 
 			h264Decoder.setupDecoder(surface);
-		}
 		H264DecoderStarted = true;
 	}
 	private void stopH264Decoder() {
@@ -654,8 +663,7 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 		H264DecoderStarted = false;
 	}
 	private void startAACDecoder() {	
-		if(aacDecoder == null) {
-			aacDecoder = new AACDecoder();
+		if(!aacDcoderStarted) {
 			aacDecoder.start();
 		}
 		aacDcoderStarted = true;
@@ -674,19 +682,21 @@ public class VideoActivity extends Activity implements View.OnClickListener {
 	private DateReceivedListener dateReceivedListener = new DateReceivedListener() {
 		
 		@Override
-		public void onH264DataReceived(byte[] arg0, int offset, int length) {
+		public void onH264DataReceived(byte[] arg0, int offset, int length, double timestamp) {
 			if(!H264DecoderStarted) {
 				startH264Decoder(new Surface(mPlaybackView.getSurfaceTexture()));
 				
 			}
-			h264Decoder.onFrame(arg0, 0, length, 0);
+//			h264Decoder.onFrame(arg0, 0, length, timestamp);
+			mMediaDataCenter.addVideoFrame(new MediaDataCenter.VideoFrameItem(arg0, 0, length, timestamp));
 		}
 		@Override
-		public void onAACDataReceived(byte[] arg0, int offset, int length) {
+		public void onAACDataReceived(byte[] arg0, int offset, int length, double timestamp) {
 			if(!aacDcoderStarted) {
 				startAACDecoder();
 			}
-			aacDecoder.onFrame(arg0, offset, length, 0);
+//			aacDecoder.onFrame(arg0, offset, length, timestamp);
+			mMediaDataCenter.addAudioData(new MediaDataCenter.AudioStreamData(arg0, offset, length, timestamp));
 		}
 	};
 	

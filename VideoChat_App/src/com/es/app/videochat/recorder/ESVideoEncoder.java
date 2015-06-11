@@ -10,7 +10,7 @@ public abstract class ESVideoEncoder {
 	abstract public boolean setupCodec(ESVideoQuality quality);
 	abstract public void start(boolean async);
 	abstract public void stop();
-	abstract public void putData(byte[] data,int length);
+	abstract public void putData(VideoFrameItem videoFrame);
 	
 	public OnEncoderListener getEncoderListener() {
 		return encoderListener;

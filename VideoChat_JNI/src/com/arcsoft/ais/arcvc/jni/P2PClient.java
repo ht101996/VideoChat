@@ -25,8 +25,8 @@ public class P2PClient {
 	}
 
 	public interface DateReceivedListener{
-		public void onH264DataReceived(byte[] data, int offset, int length);
-		public void onAACDataReceived(byte[] data, int offset, int length);
+		public void onH264DataReceived(byte[] data, int offset, int length, double timestamp);
+		public void onAACDataReceived(byte[] data, int offset, int length, double timestamp);
 	}
 	
 	/**
@@ -62,50 +62,55 @@ public class P2PClient {
 	
 	public native void startRTPSession(String gpidOfRemotePeer);
 	
-	public native void send264Packet(String packetType, H264Nal nalu);
+	public native void send264Packet(String packetType, H264Nal nalu, long timestamp);
 	
 	public native void sendAACPacket(String packetType,AACNal nalu);
-	public native void sendAACESData(byte[] data, int length);
+	public native void sendAACESData(byte[] data, int length, long timestamp);
 
 	
-//	String outputFile = Environment.getExternalStorageDirectory().getAbsolutePath()
-//			.concat(File.separator).concat("chatdump").concat(File.separator).concat("testouputstream");
-//	int outputindex = 1;
-//	private void output(String packetType, int nalutype, byte[] input) {
-//		FileOutputStream fos;
-//		try{
-//			///if(input[4] == 0x65 || input[4] == 0x67 || input[4] == 0x68) {
-//			fos = new FileOutputStream( new File(outputFile.concat(outputindex+"_"+packetType+"_"+nalutype+".txt")), true);
-//			fos.write(input);
-//			fos.flush();
-//			fos.close();
-//		//	}
-//			outputindex ++;
-//		}catch(Exception e) {
-//			e.printStackTrace();
-//		}
-//	}
-//	
-//	private void output(byte[] input) {
-//		FileOutputStream fos;
-//		try{
-//			///if(input[4] == 0x65 || input[4] == 0x67 || input[4] == 0x68) {
-//			fos = new FileOutputStream( new File(outputFile.concat(outputindex + ".txt")), true);
-//			fos.write(input);
-//			fos.flush();
-//			fos.close();
-//		//	}
-//			outputindex ++;
-//		}catch(Exception e) {
-//			e.printStackTrace();
-//		}
-//	}
+	String outputFile = Environment.getExternalStorageDirectory().getAbsolutePath()
+			.concat(File.separator).concat("chatdump").concat(File.separator).concat("testouputstream");
+	int outputindex = 1;
+	private void output(String packetType, int nalutype, byte[] input) {
+		FileOutputStream fos;
+		try{
+			///if(input[4] == 0x65 || input[4] == 0x67 || input[4] == 0x68) {
+			fos = new FileOutputStream( new File(outputFile.concat(outputindex+"_"+packetType+"_"+nalutype+".txt")), true);
+			fos.write(input);
+			fos.flush();
+			fos.close();
+		//	}
+			outputindex ++;
+		}catch(Exception e) {
+			e.printStackTrace();
+		}
+	}
 	
-	public  void send264Packet2(String packetType, H264Nal nalu){
+	private void output(byte[] input) {
+		FileOutputStream fos;
+		try{
+			///if(input[4] == 0x65 || input[4] == 0x67 || input[4] == 0x68) {
+			fos = new FileOutputStream( new File(outputFile.concat(outputindex + ".txt")), true);
+			fos.write(input);
+			fos.flush();
+			fos.close();
+		//	}
+			outputindex ++;
+		}catch(Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * 
+	 * @param packetType
+	 * @param nalu
+	 * @param timestampUs
+	 */
+	public  void send264Packet2(String packetType, H264Nal nalu, long timestampUs){
 		
 //		output(packetType, nalu.getType(), nalu.getPayload());
-		
-		send264Packet(packetType, nalu);
+		send264Packet(packetType, nalu, timestampUs);
 	}
 	
 	/**
@@ -157,16 +162,16 @@ public class P2PClient {
 		this.dataListener = listener;
 	}
 	
-	public void receiveH264Data(byte[] data, int offset, int length) {
+	public void receiveH264Data(byte[] data, int offset, int length, double timestamp) {
 //		output(data);
 		if(dataListener != null)
-			dataListener.onH264DataReceived(data, offset, length);
+			dataListener.onH264DataReceived(data, offset, length, timestamp);
 	}
 
-	public void receiveAACData(byte[] data, int offset, int length) {
+	public void receiveAACData(byte[] data, int offset, int length, double timestamp) {
 //		output(data);
 		if(dataListener != null)
-			dataListener.onAACDataReceived(data, offset, length);
+			dataListener.onAACDataReceived(data, offset, length, timestamp);
 	}
 	
 	public static void onAudioReceive(byte[] value) {

@@ -23,6 +23,7 @@ import com.arcsoft.ais.arcvc.R;
 import com.es.app.videochat.recorder.ESNativeH264Encoder;
 import com.es.app.videochat.recorder.ESVideoQuality;
 import com.es.app.videochat.recorder.ESRecordListener.OnEncoderListener;
+import com.es.app.videochat.recorder.VideoFrameItem;
 
 public class CameraFragment extends Fragment implements PreviewCallback {
 	private final int previewFormat = ImageFormat.NV21;
@@ -172,6 +173,7 @@ public class CameraFragment extends Fragment implements PreviewCallback {
 		if(camera == null)
 			return;
 		camera.stopPreview();
+		camera.setPreviewCallback(null);
 	}
 
 	private void setCameraDisplayOrientation(int cameraId, Camera camera) {
@@ -208,7 +210,7 @@ public class CameraFragment extends Fragment implements PreviewCallback {
 	@Override
 	public void onPreviewFrame(byte[] data, Camera camera) {
 		if(isSendingData)
-			h264Encoder.putData(data,data.length);
+			h264Encoder.putData(new VideoFrameItem(data, System.currentTimeMillis()));
 	}
 	 
 	

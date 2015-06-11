@@ -43,13 +43,13 @@ extern jobject javaObj;
 volatile double currentAudioPlayTime = 0;
 pthread_mutex_t* g_pLockTimestamp = NULL;
 
-static void notifyJNIH264DataReceived(const jbyte* data, int length) {
+static void notifyJNIH264DataReceived(const jbyte* data, int length, double timestamp) {
 	JNIEnv* jniEnv = NULL;
 	jclass clientClass = NULL;
 	jmethodID javaMethod = NULL;
 	jbyteArray resByteArr = NULL;
 	do {
-		if (!jvm || !data) {
+		if (!jvm || !data || length == 0) {
 			LOGE("notifyJNIH264DataReceived parameter  is NULL\n");
 			break;
 		}
@@ -66,7 +66,7 @@ static void notifyJNIH264DataReceived(const jbyte* data, int length) {
 			LOGE("Get Class P2PClient failed.\n");
 			break;
 		}
-		javaMethod = jniEnv->GetMethodID(clientClass, "receiveH264Data", "([BII)V");
+		javaMethod = jniEnv->GetMethodID(clientClass, "receiveH264Data", "([BIID)V");
 		if (javaMethod == NULL) {
 			LOGE("Get method receiveH264Data .\n");
 			break;
@@ -76,13 +76,13 @@ static void notifyJNIH264DataReceived(const jbyte* data, int length) {
 			LOGE("NewByteArray Out of memory, LINE: %d\n", __LINE__);
 			break;
 		}
-		LOGD("resByteArr: %p, pixArrLen: %d, len: %d", resByteArr, jniEnv->GetArrayLength(resByteArr), length);
+		LOGD("notifyJNIH264DataReceived resByteArr: %p, pixArrLen: %d, len: %d", resByteArr, jniEnv->GetArrayLength(resByteArr), length);
 		jniEnv->SetByteArrayRegion(resByteArr, 0, length, data);
 		if (jniEnv->ExceptionCheck()) {
 			LOGE("SetIntArrayRegion Exception.\n");
 			jniEnv->ExceptionDescribe();
 		} else {
-			jniEnv->CallVoidMethod(javaObj, javaMethod, resByteArr, 0, length);
+			jniEnv->CallVoidMethod(javaObj, javaMethod, resByteArr, 0, length, timestamp);
 		}
 	} while (false);
 	if (jniEnv) {
@@ -97,7 +97,7 @@ static void notifyJNIH264DataReceived(const jbyte* data, int length) {
 		jvm->DetachCurrentThread();
 	}
 }
-static void notifyJNIAACDataReceived(const jbyte* data, int length) {
+static void notifyJNIAACDataReceived(const jbyte* data, int length, double timestamp) {
 	JNIEnv* jniEnv = NULL;
 	jclass clientClass = NULL;
 	jmethodID javaMethod = NULL;
@@ -120,7 +120,7 @@ static void notifyJNIAACDataReceived(const jbyte* data, int length) {
 			LOGE("Get Class P2PClient failed.\n");
 			break;
 		}
-		javaMethod = jniEnv->GetMethodID(clientClass, "receiveAACData", "([BII)V");
+		javaMethod = jniEnv->GetMethodID(clientClass, "receiveAACData", "([BIID)V");
 		if (javaMethod == NULL) {
 			LOGE("Get method receiveH264Data .\n");
 			break;
@@ -130,13 +130,13 @@ static void notifyJNIAACDataReceived(const jbyte* data, int length) {
 			LOGE("NewByteArray Out of memory, LINE: %d\n", __LINE__);
 			break;
 		}
-		LOGD("resByteArr: %p, pixArrLen: %d, len: %d", resByteArr, jniEnv->GetArrayLength(resByteArr), length);
+		LOGD("notifyJNIAACDataReceived resByteArr: %p, pixArrLen: %d, len: %d", resByteArr, jniEnv->GetArrayLength(resByteArr), length);
 		jniEnv->SetByteArrayRegion(resByteArr, 0, length, data);
 		if (jniEnv->ExceptionCheck()) {
 			LOGE("SetIntArrayRegion Exception.\n");
 			jniEnv->ExceptionDescribe();
 		} else {
-			jniEnv->CallVoidMethod(javaObj, javaMethod, resByteArr, 0, length);
+			jniEnv->CallVoidMethod(javaObj, javaMethod, resByteArr, 0, length, timestamp);
 		}
 	} while (false);
 	if (jniEnv) {
@@ -631,12 +631,12 @@ void* thr_send_image_to_display(void* arg)
 {
 	VideoRTPSession* sess = (VideoRTPSession*)arg;
 	usleep(VIDEO_START_WAIT_TIME);
-	sess->switchPlayingStatus();
-	while (!sess->hasSendEnded()) {
-		if (sess->displayVideoImage()) {
-			break;
-		}
-	}
+//	sess->switchPlayingStatus();
+//	while (!sess->hasSendEnded()) {
+//		if (sess->displayVideoImage()) {
+//			break;
+//		}
+//	}
 	return (void*)0;
 }
 
@@ -644,11 +644,11 @@ void* thr_send_image_to_display(void* arg)
 void* thr_decode_video(void* arg)
 {
 	VideoRTPSession* sess = (VideoRTPSession*)arg;
-	while (!sess->hasSendEnded()) {
-		if (sess->decodeVideoFrame() != 0) {
-			break;
-		}
-	}
+//	while (!sess->hasSendEnded()) {
+//		if (sess->decodeVideoFrame() != 0) {
+//			break;
+//		}
+//	}
 	return (void*)0;
 }
 
@@ -662,8 +662,8 @@ VideoRTPSession::VideoRTPSession()
 	, m_height(0)
 	, out_buffer(NULL)
 	, rgbbuf(NULL)
-	, mark(true)
-	, isSendEnded(true)
+//	, mark(true)
+//	, isSendEnded(true)
 	, pNaluBuf(NULL)
 	, bufLen(0)
 	, qNalu(NULL)
@@ -673,14 +673,14 @@ VideoRTPSession::VideoRTPSession()
 	, pLockDecode(NULL)
 	, pLockDisplay(NULL)
 	, m_decspeed(NORM_SPEED)
-	, m_incrspeedcnt(0)
+//	, m_incrspeedcnt(0)
 	, firstTimestamp(0)
 	, firstNTPTimestamp(0)
 	, timestamp(0)
 	, firstSequenceNum(0)
 	, extraDeltaTime(0)
 	, sequenceNum(0)
-	, m_isPlaying(false)
+//	, m_isPlaying(false)
 	, eFrom(DEV_UNDEFINED)
 {
 	av_register_all();
@@ -751,7 +751,7 @@ VideoRTPSession::~VideoRTPSession()
 		av_free(out_buffer);
 	}
 
-	isSendEnded = true;
+//	isSendEnded = true;
 	pthread_join(tid_display, NULL);
 	tid_display = 0;
 	if (pLockDisplay) {
@@ -791,104 +791,112 @@ VideoRTPSession::~VideoRTPSession()
 	CORE_SAFEDELETE(qImage);
 }
 
+//void VideoRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPacket &rtppack)
+//{
+//	LOGD("VideoRTPSession ProcessRTPPacket !");
+////	float rtt = ((srcdat.RR_GetReceiveTime().ntptimetran() - srcdat.RR_GetLastSRTimestamp() - srcdat.RR_GetDelaySinceLastSR())*1000)/65536;
+////	LOGD("VideoRTPSession RTPSourceData,rtt = %f, lostRate=%lf, PacketsLost=%d, jitter=%f", rtt, srcdat.RR_GetFractionLost(), srcdat.RR_GetPacketsLost(), ((float)(srcdat.RR_GetJitter() * 1000) / 65536));
+//	do {
+//
+//		if (mark) {// mark的pack是完整包的最后一个pack
+//
+//			//set h264 data by cxd
+//					notifyJNIH264DataReceived((const jbyte* )pNaluBuf, bufLen);
+////			addToNaluQueue(pNaluBuf, bufLen, timestamp, sequenceNum);
+//			if (isSendEnded) {
+//				isSendEnded = false;
+//			}
+////			if (!tid_decode) {
+////				pthread_create(&tid_decode, NULL, thr_decode_video, this);
+////			}
+//
+//			// nal unit start code
+//			pNaluBuf[0] = 0;
+//			pNaluBuf[1] = 0;
+//			pNaluBuf[2] = 0;
+//			pNaluBuf[3] = 1;
+//			bufLen = 4;
+//
+//			h264_nal_t nal;
+//			nal.i_ref_idc = *rtppack.GetPayloadData();
+//			nal.i_type = *(rtppack.GetPayloadData() + sizeof(int));
+//			nal.i_payload = rtppack.GetPayloadLength() - 8 - RTP_PKT_HEADER_LENGTH; // add nal unit start code
+//			nal.p_payload = rtppack.GetPayloadData() + 8 + RTP_PKT_HEADER_LENGTH;
+//
+//			if (eFrom == DEV_UNDEFINED) {
+//				if (*nal.p_payload != 0x67) {
+//					eFrom = DEV_PC;
+//				} else {
+//					eFrom = DEV_ANDROID;
+//				}
+//			}
+//
+//			if (eFrom == DEV_PC) {
+//				pNaluBuf[bufLen++] = ( 0x00 << 7 ) | ( nal.i_ref_idc << 5 ) | nal.i_type;
+//			}
+//			memcpy(pNaluBuf + bufLen, nal.p_payload, nal.i_payload);
+//			bufLen += nal.i_payload;
+//
+//			timestamp = *((double*)(rtppack.GetPayloadData() + 8));
+//			sequenceNum = *((uint32_t*)(rtppack.GetPayloadData() + 8 + sizeof(double)));
+////			if (!firstTimestamp) {
+////				pthread_mutex_lock(g_pLockTimestamp);
+////				firstTimestamp = GetAudioRTPSession()->getFirstTimestamp() ? GetAudioRTPSession()->getFirstTimestamp() : timestamp;
+////				pthread_mutex_unlock(g_pLockTimestamp);
+////			}
+////			if (!firstSequenceNum) {
+////				firstSequenceNum = sequenceNum;
+////			}
+////			timestamp = firstTimestamp + (double)(sequenceNum - firstSequenceNum) * (VIDEO_TIMESTAMP_INCREMENT);
+//			LOGD("VideoRTPSession  Timestamp:%lf, SequenceNumber:%u, __LINE__: %d\n", timestamp, sequenceNum, __LINE__);
+//
+//		} else {
+//			size_t len = rtppack.GetPayloadLength() - RTP_PKT_HEADER_LENGTH;
+//			LOGD("VideoRTPSession ProcessRTPPacket, mark== false, pNaluBuf:%p, bufLen:%d, len: %d, __LINE__: %d\n", pNaluBuf, bufLen, len, __LINE__);
+//			memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() + RTP_PKT_HEADER_LENGTH, len);
+//			bufLen += len;
+//
+//
+//		}
+//		mark = rtppack.HasMarker();
+//
+//	} while (false);
+//}
+
+
 void VideoRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPacket &rtppack)
 {
 	LOGD("VideoRTPSession ProcessRTPPacket !");
+//	float rtt = ((srcdat.RR_GetReceiveTime().ntptimetran() - srcdat.RR_GetLastSRTimestamp() - srcdat.RR_GetDelaySinceLastSR())*1000)/65536;
+//	LOGD("VideoRTPSession RTPSourceData,rtt = %f, lostRate=%lf, PacketsLost=%d, jitter=%f", rtt, srcdat.RR_GetFractionLost(), srcdat.RR_GetPacketsLost(), ((float)(srcdat.RR_GetJitter() * 1000) / 65536));
+	bool mark = rtppack.HasMarker();
+	if (mark) {// mark的pack是完整包的最后一个pack
 
-	do {
-		if (mark) {// mark的pack是完整包的最后一个pack
-			LOGD("VideoRTPSession bufLen: %d, __LINE__: %d\n", bufLen, __LINE__);
+		size_t len = rtppack.GetPayloadLength() - RTP_PKT_HEADER_LENGTH;
+		memcpy(pNaluBuf + bufLen,rtppack.GetPayloadData() + RTP_PKT_HEADER_LENGTH, len);
+		bufLen += len;
 
-			//set h264 data by cxd
-					notifyJNIH264DataReceived((const jbyte* )pNaluBuf, bufLen);
-//			addToNaluQueue(pNaluBuf, bufLen, timestamp, sequenceNum);
-			if (isSendEnded) {
-				isSendEnded = false;
-			}
-//			if (!tid_decode) {
-//				pthread_create(&tid_decode, NULL, thr_decode_video, this);
-//			}
-#if __DECODE__ == 0
-			bufLen = 0;
-#else
-			bufLen = 4;
-#endif
+		timestamp = *((double*)(rtppack.GetPayloadData()));
+		sequenceNum = *((uint32_t*)(rtppack.GetPayloadData()+ sizeof(double)));
+		LOGD("VideoRTPSession  Timestamp:%lf, SequenceNumber:%u, __LINE__: %d\n", timestamp, sequenceNum, __LINE__);
 
-			
-#if __DECODE__ == 1
-			// nal unit start code
-			pNaluBuf[0] = 0;
-			pNaluBuf[1] = 0;
-			pNaluBuf[2] = 0;
-			pNaluBuf[3] = 1;
-#endif
-			h264_nal_t nal;
-			nal.i_ref_idc = *rtppack.GetPayloadData();
-			nal.i_type = *(rtppack.GetPayloadData() + sizeof(int));
-			nal.i_payload = rtppack.GetPayloadLength() - 8 - RTP_PKT_HEADER_LENGTH; // add nal unit start code
+		notifyJNIH264DataReceived((const jbyte* )pNaluBuf, bufLen, timestamp);
+		memset(pNaluBuf, 0, bufLen);
+		bufLen = 0;
+	} else {
+		size_t len = rtppack.GetPayloadLength() - RTP_PKT_HEADER_LENGTH;
+		LOGD("VideoRTPSession ProcessRTPPacket, mark== false, pNaluBuf:%p, bufLen:%d, len: %d, __LINE__: %d\n", pNaluBuf, bufLen, len, __LINE__);
+		memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() + RTP_PKT_HEADER_LENGTH, len);
+		bufLen += len;
 
 
-			nal.p_payload = rtppack.GetPayloadData() + 8 + RTP_PKT_HEADER_LENGTH;
-			if (eFrom == DEV_UNDEFINED) {
-				if (*nal.p_payload != 0x67) {
-					eFrom = DEV_PC;
-				} else {
-					eFrom = DEV_ANDROID;
-				}
-			}
-
-			if (eFrom == DEV_PC) {
-				pNaluBuf[bufLen++] = ( 0x00 << 7 ) | ( nal.i_ref_idc << 5 ) | nal.i_type;
-			}
-			memcpy(pNaluBuf + bufLen, nal.p_payload, nal.i_payload);
-			bufLen += nal.i_payload;
-
-			timestamp = *((double*)(rtppack.GetPayloadData() + 8));
-			sequenceNum = *((uint32_t*)(rtppack.GetPayloadData() + 8 + sizeof(double)));
-			if (!firstTimestamp) {
-				pthread_mutex_lock(g_pLockTimestamp);
-				firstTimestamp = GetAudioRTPSession()->getFirstTimestamp() ? GetAudioRTPSession()->getFirstTimestamp() : timestamp;
-				pthread_mutex_unlock(g_pLockTimestamp);
-			}
-			if (!firstSequenceNum) {
-				firstSequenceNum = sequenceNum;
-			}
-			timestamp = firstTimestamp + (double)(sequenceNum - firstSequenceNum) * (VIDEO_TIMESTAMP_INCREMENT);
-
-			LOGD("receive fps Timestamp:%lf, SequenceNumber:%u\n", timestamp, sequenceNum);
-			LOGD("VideoRTPSession firstTimestamp:%lf, __LINE__: %d\n",firstTimestamp, __LINE__);
-			LOGD("VideoRTPSession  Timestamp:%lf, SequenceNumber:%u, __LINE__: %d\n", timestamp, sequenceNum, __LINE__);
-#if __DECODE__ == 0
-			FILE* frecv = fopen("/mnt/sdcard/recv.rgba", "ab");
-			fwrite(rtppack.GetPayloadData() + 8, len, 1, frecv);
-			fclose(frecv);
-#endif
-		} else {
-			size_t len = rtppack.GetPayloadLength() - RTP_PKT_HEADER_LENGTH;
-			LOGD("pNaluBuf:%p, bufLen:%d, len: %d, __LINE__: %d\n", pNaluBuf, bufLen, len, __LINE__);
-			memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() + RTP_PKT_HEADER_LENGTH, len);
-			bufLen += len;
-
-#if __DECODE__ == 0
-			FILE* frecv = fopen("/mnt/sdcard/recv.rgba", "ab");
-			fwrite(rtppack.GetPayloadData(), len, 1, frecv);
-			fclose(frecv);
-#endif
-		}
-		mark = rtppack.HasMarker();
-#if __DECODE__ == 0
-		FILE* fmark = fopen("/mnt/sdcard/mark", "a");
-		fwrite(mark?"1":"0", 1, 1, fmark);
-		fclose(fmark);
-#endif
-	} while (false);
+	}
 }
-
 int VideoRTPSession::decodeVideoFrame()
 {
 	if (!video_dec) {
 		LOGD("video_dec is NULL, __LINE__: %d\n", __LINE__);
-		isSendEnded = true;
+//		isSendEnded = true;
 		return -1;
 	}
 
@@ -1141,26 +1149,18 @@ AudioRTPSession::~AudioRTPSession()
 void AudioRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPacket &rtppack)
 {
 	LOGD("AudioRTPSession ProcessRTPPacket !");
+	if(srcdat.RR_HasInfo()) {
+		float rtt = ((srcdat.RR_GetReceiveTime().ntptimetran() - srcdat.RR_GetLastSRTimestamp() - srcdat.RR_GetDelaySinceLastSR())*1000)/65536;
+		LOGD("~~AudioRTPSession RTPSourceData,rtt = %f, lostRate=%lf, PacketsLost=%d, jitter=%d",rtt, srcdat.RR_GetFractionLost(), srcdat.RR_GetPacketsLost(), srcdat.RR_GetJitter());
+	}
+	else
+		LOGD("RTPSourceData NONE");
+
 	if (rtppack.HasMarker()) {// mark的pack是完整包的最后一个pack
-		LOGD("AudioRTPSession bufLen: %d, __LINE__: %d\n", bufLen, __LINE__);
 		double timestamp = *((double*)rtppack.GetPayloadData());
 		uint32_t sequenceNum = *((uint32_t*)(rtppack.GetPayloadData() + sizeof(double)));
-		if (!firstTimestamp) {
-			pthread_mutex_lock(g_pLockTimestamp);
-			firstTimestamp = GetVideoRTPSession()->getFirstTimestamp() ? GetVideoRTPSession()->getFirstTimestamp() : timestamp;
-			pthread_mutex_unlock(g_pLockTimestamp);
-//			firstTimestamp -= audioMinusVideo;
-//			RTPTime rtptime = srcdat.SR_GetNTPTimestamp();
-//			firstNTPTimestamp = rtptime.GetDouble();
-		}
-		if (!firstSequenceNum) {
-			firstSequenceNum = sequenceNum;
-		}
-		timestamp = firstTimestamp - audioMinusVideo + (double)(sequenceNum - firstSequenceNum) * AUDIO_TIMESTAMP_INCREMENT;
 
-		LOGD("AudioRTPSession firstNTPTimestamp:%lf, __LINE__: %d\n",firstNTPTimestamp, __LINE__);
-		LOGD("AudioRTPSession firstTimestamp:%lf, __LINE__: %d\n",firstTimestamp, __LINE__);
-		LOGD("AudioRTPSession Timestamp:%lf, SequenceNumber:%u, __LINE__: %d\n", timestamp, sequenceNum, __LINE__);
+		LOGD("AudioRTPSession Timestamp:%lf, sequenceNum = %d, __LINE__: %d\n", timestamp,sequenceNum, __LINE__);
 
 //		FILE* flog = fopen("/mnt/sdcard/audiorecv.log", "a");
 //		if (flog) {
@@ -1172,15 +1172,15 @@ void AudioRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 //			fclose(flog);
 //		}
 
-		size_t len = rtppack.GetPayloadLength();// - RTP_PKT_HEADER_LENGTH; // add nal unit start code
-		LOGD("AudioRTPSessionrtppack length:%d, bufLen=%d __LINE__: %d\n", len, bufLen, __LINE__);
-		memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() , len);
+		size_t len = rtppack.GetPayloadLength() - RTP_PKT_HEADER_LENGTH; // add nal unit start code
+		memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() + RTP_PKT_HEADER_LENGTH , len);
 		bufLen += len;
 		if (pNaluBuf) {
 			if (bufLen > 0) {
 				LOGD("AudioRTPSession ProcessRTPPacket ....................rtppack.GetPayloadType:%d\n",rtppack.GetPayloadType());
 				//set aac data by cxd
-									notifyJNIAACDataReceived((const jbyte* )pNaluBuf, bufLen);
+				notifyJNIAACDataReceived((const jbyte* )pNaluBuf, bufLen, timestamp);
+
 //				addToAACQueue(pNaluBuf, bufLen, timestamp, sequenceNum);
 //				if (isSendEnded) {
 //					isSendEnded = false;
@@ -1193,10 +1193,10 @@ void AudioRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 		memset(pNaluBuf, 0, bufLen);//清空缓存，为下次做准备
 		bufLen = 0;
 	} else {
-		LOGD("AudioRTPSession ProcessRTPPacket __LINE__: %d\n", __LINE__);
-		size_t len = rtppack.GetPayloadLength();
+		LOGD("AudioRTPSession ProcessRTPPacket Mark == false !");
+		size_t len = rtppack.GetPayloadLength() - RTP_PKT_HEADER_LENGTH;
 		LOGD("AudioRTPSession ProcessRTPPacket pNaluBuf:%p, bufLen:%d, len: %d\n", pNaluBuf, bufLen, len);
-		memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() , len);
+		memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() + RTP_PKT_HEADER_LENGTH, len);
 		bufLen += len;
 	}
 }
@@ -1585,9 +1585,23 @@ void AudioRTPSession::reset()
 
 void AVBaseRTPSession::OnPollThreadStep()
 {
+
+
 	BeginDataAccess();
-    if (GotoFirstSourceWithData())
+	bool bGotoFirstSourceWithData = GotoFirstSourceWithData();
+	bool bGotoFirstSource = GotoFirstSource();
+	RTPSourceData *srcdat0 = GetCurrentSourceInfo();
+	if(srcdat0)
+	{
+//		RTPSourceData *srcdat0 = GetCurrentSourceInfo();
+		//LOGD("AVBaseRTPSession::OnPollThreadStep bGotoFirstSourceWithData=%d bGotoFirstSource=%d srcdat0=%p", bGotoFirstSourceWithData, bGotoFirstSource,srcdat0);
+//		float rtt = ((srcdat0->RR_GetReceiveTime().ntptimetran() - srcdat0->RR_GetLastSRTimestamp() - srcdat0->RR_GetDelaySinceLastSR())*1000)/65536;
+//		 LOGD("AVBaseRTPSession::OnPollThreadStep SR_HasInfo=%d  RR_HasInfo = %d, INF_GetNumPacketsReceived = %d SR_GetPacketCount=%d, RR_GetPacketsLost=%d",
+//				 srcdat0->SR_HasInfo(), srcdat0->RR_HasInfo(), srcdat0->INF_GetNumPacketsReceived(), srcdat0->SR_GetPacketCount(), srcdat0->RR_GetPacketsLost());
+	}
+	if (bGotoFirstSourceWithData)
     {
+
         do
         {
             RTPPacket *pack;

@@ -1,6 +1,8 @@
 package com.arcsoft.ais.arcvc.activity;
 
 import java.io.IOException;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -37,6 +39,7 @@ import com.arcsoft.coreapi.sdk.CoreVCDef.VCParam;
  * well.
  */
 public class LoginActivity extends Activity {
+	private final static String tag = LoginActivity.class.getSimpleName();
 	/**
 	 * A dummy authentication store containing known user names and passwords.
 	 * TODO: remove after connecting to a real authentication system.
@@ -79,6 +82,7 @@ public class LoginActivity extends Activity {
 			//Log.i(Global.TAG, "macAddress:" + CommonUtils.getLocalMacAddressFromIp(context));
 			//Configer.setValue("device_id", CommonUtils.getLocalMacAddressFromIp(getApplicationContext()));
 			Configer.setValue("peer_id", gpid);
+			Log.d(tag, "Curren gpid:"+gpid);
 			
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -88,7 +92,10 @@ public class LoginActivity extends Activity {
 		mEmail = getIntent().getStringExtra(EXTRA_EMAIL);
 		mEmailView = (EditText) findViewById(R.id.email);
 		if (mEmailView.getText() == null || "".equals(mEmailView.getText().toString())) {
-			mEmail = "mm@aa.aa" ;
+			if(android.os.Build.VERSION.SDK_INT > 20)
+				mEmail = "mm@aa.aa" ;
+			else
+				mEmail = "gg@aa.aa" ;
 		}
 		mEmailView.setText(mEmail);
 
@@ -164,7 +171,15 @@ public class LoginActivity extends Activity {
 //		local_ip_TextView.setText(local_ip_TextView.getText() +":"+ NetworkUtils.getLocalIpAddress2(getApplicationContext()));
 //		
 		Log.i(Global.TAG, "LoginActivity: onCreate============finished!");
-		
+		Timer timer = new Timer();
+		timer.schedule(new TimerTask() {
+			
+			@Override
+			public void run() {
+				autoLogin();
+				
+			}
+		}, 500);
 		
 	}
 
@@ -242,6 +257,15 @@ public class LoginActivity extends Activity {
 		}
 	}
 
+	
+	private void autoLogin() {
+		// Store values at the time of the login attempt.
+		mEmail = mEmailView.getText().toString();
+		mPassword = mPasswordView.getText().toString();
+		mAuthTask = new UserLoginTask();
+		mAuthTask.execute((Void) null);
+	}
+	
 	/**
 	 * Shows the progress UI and hides the login form.
 	 */
