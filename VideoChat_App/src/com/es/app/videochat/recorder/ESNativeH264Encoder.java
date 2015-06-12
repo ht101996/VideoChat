@@ -464,13 +464,8 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 		}
 		}
 	}
-	private boolean printTimeInfo = true;
 	@Override
 	public void putData(VideoFrameItem videoFrame) {
-		 if(printTimeInfo) {
-			 printTimeInfo = false;
-         	System.out.println("---cxd, video firstReceivedTime :"+System.currentTimeMillis());
-         }
 		if(mediaCodec != null)
 		{
 			byte[] data =videoFrame.getDataBytes();

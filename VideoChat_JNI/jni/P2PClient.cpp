@@ -218,8 +218,8 @@ jint JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_pausePlaying
 {
 	bool isPlaying = false;
 	if (audioSession) {
-		audioSession->GetAudioRTPSession()->switchPlayingStatus();
-		isPlaying = audioSession->GetAudioRTPSession()->isPlaying();
+//		audioSession->GetAudioRTPSession()->switchPlayingStatus();
+//		isPlaying = audioSession->GetAudioRTPSession()->isPlaying();
 	}
 	if (videoSession) {
 //		videoSession->GetVideoRTPSession()->switchPlayingStatus();
@@ -260,11 +260,12 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_init
 void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit
   (JNIEnv * env, jobject clazz)
 {
+	LOGD("Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit Start!");
 	if (pIClient) {
 		pIClient->UnInit();
 		pIClient = NULL;
 	}
-
+	LOGD("Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit mark 1 ");
 	if (videoSession != NULL) {
 		VideoRTPSession* videoSess = videoSession->GetVideoRTPSession();
 		CORE_SAFEDELETE(videoSess);
@@ -272,7 +273,7 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit
 		CORE_SAFEDELETE(audioSess);
 		videoSession->Destroy();
 	}
-
+	LOGD("Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit mark 2 ");
 	if (audioSession != NULL) {
 		if (NULL == videoSession) {
 			VideoRTPSession* videoSess = audioSession->GetVideoRTPSession();
@@ -282,15 +283,16 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit
 		}
 		audioSession->Destroy();
 	}
-
+	LOGD("Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit mark 3 ");
 	CORE_SAFEDELETE(videoSession);
 	CORE_SAFEDELETE(audioSession);
 	env->DeleteGlobalRef(javaObj);
-
+	LOGD("Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit mark 4 ");
 	memset(arrADTS, 0, sizeof(arrADTS));
 	if (stAACFrameBuf.pBuf) {
 		free(stAACFrameBuf.pBuf);
 	}
+	LOGD("Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit end~~");
 }
 
 void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendMsg

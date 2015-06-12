@@ -17,7 +17,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/inc \
 LOCAL_LDLIBS := -llog -lz -lc -lm \
 
 LOCAL_LDFLAGS += -L$(LOCAL_PATH)/libs \
-				 -L$(LOCAL_PATH)/libs\libffmpeg \
+				 -L$(LOCAL_PATH)/libs/libffmpeg \
 				 -lavformat -lavcodec -lavutil -lswscale -lswresample -lp2p_interface -luftp -lrudp -lcms -lcmc -lorm -larcsoft_aes -lmsgcc -lmsgcs -losplatform -lJrtp -lJthread \
 
 

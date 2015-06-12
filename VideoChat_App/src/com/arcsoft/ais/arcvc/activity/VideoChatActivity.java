@@ -129,6 +129,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		switch (v.getId()) {
 		case R.id.startBtn:
 			startChat();
+			v.setVisibility(View.INVISIBLE);
 			break;
 		case R.id.stopBtn:
 			stopChat();
