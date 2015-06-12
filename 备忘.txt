@@ -1,3 +1,10 @@
 登录：
  /asserts/config.ini配置相关信息；
  会做时间戳验证
+
+
+已知问题：
+getnextpacket 会crash
+client unknit crash
+RR出现一样的记录的bug
+断网的提示函数
