@@ -29,6 +29,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 	public final String TAG = "ES.ESNativeH264Encoder";
 	
 	private MediaCodec mediaCodec = null;  
+	private MediaFormat mediaFormat = null;
     byte[] m_info = null;
     
     ESVideoQuality videoQuality = null;
@@ -41,6 +42,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
     private volatile Object mutex = null;
     
     private Thread encodeThread = null;
+    private boolean bThreadStop = false;
 
     private int colorFormat = 0;
     
@@ -188,44 +190,52 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 		
 		mediaCodec = MediaCodec.createEncoderByType(mimeType);  
 		
-        MediaFormat inputFormat = MediaFormat.createVideoFormat(mimeType, width, height);  
+        mediaFormat = MediaFormat.createVideoFormat(mimeType, width, height);  
         
-        inputFormat.setInteger(MediaFormat.KEY_BIT_RATE, videoQuality.bitrate);  
-        inputFormat.setInteger(MediaFormat.KEY_FRAME_RATE, videoQuality.framerate);  
-        inputFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat);      
-        inputFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 75); //关键帧间隔时间 单位s  
-        inputFormat.setInteger("stride", stride);
-        inputFormat.setInteger("slice-height", sliceHeight);  
+        mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, videoQuality.bitrate);  
+        mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, videoQuality.framerate);  
+        mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat);      
+        mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 75); //关键帧间隔时间 单位s  
+        mediaFormat.setInteger("stride", stride);
+        mediaFormat.setInteger("slice-height", sliceHeight);  
         
-        try {
-            mediaCodec.configure(inputFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);  
-            mediaCodec.start();
-                        
-		} catch (Exception e) {
-			return false;
-		}
+        
         return true;
 	}
 	
 	@Override
 	public void stop() {
-		
-		if(encodeThread != null)
-		{
-			encodeThread.interrupt();
-			try {
-				encodeThread.join();
-			} catch (Exception e) {
-			}
-			encodeThread = null;
-		}
+		bThreadStop = true;
+		encodeThread = null;
+//		if(encodeThread != null)
+//		{
+//			try {
+//				encodeThread.join();
+//			} catch (Exception e) {
+//			}
+//			encodeThread = null;
+//		}
 		mediaCodec.stop();  
-        mediaCodec.release();  
+       
+	}
+	
+	@Override
+	public void release() {
+		if(mediaCodec != null)
+			 mediaCodec.release();  
         mediaCodec = null;
 	}
+	
 	@Override
 	public void start(boolean async)
 	{
+		try {
+            mediaCodec.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);  
+            mediaCodec.start();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
 		if(async)
 		{
 			if(null == encodeThread)
@@ -256,7 +266,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 	@Override
 	public void run() {
 		
-		while (!Thread.interrupted()) {
+		while (!bThreadStop) {
 			
 			int pos = 0; 
 					

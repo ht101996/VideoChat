@@ -15,7 +15,7 @@
 #define MAX_AAC_FRAME_SIZE 8192*2 // 8192 == 2^13
 #define ADTS_HEADER_LENGTH 7
 #define AUDIO_TIMESTAMP_INCREMENT	1024 // 160
-#define VIDEO_TIMESTAMP_INCREMENT	3000 // 30 fps
+#define VIDEO_TIMESTAMP_INCREMENT	6000//3000 // 30 fps
 
 enum {
 	//MSG_TYPE_DEFAULT = 0,
@@ -92,7 +92,7 @@ static void notifyJNI(char* gpid, char* msg) {
 		if (javaClass == NULL) {
 			break;
 		}
-		javaMethod = jniEnv->GetStaticMethodID(javaClass, "onMsgReceive",
+		javaMethod = jniEnv->GetMethodID(javaClass, "receiveStringMsg",
 				"(Ljava/lang/String;Ljava/lang/String;)V");
 		if (javaMethod == NULL) {
 			break;
@@ -105,7 +105,7 @@ static void notifyJNI(char* gpid, char* msg) {
 		if (string2 == NULL) {
 			break;
 		}
-		jniEnv->CallStaticVoidMethod(javaClass, javaMethod, string1, string2);
+		jniEnv->CallVoidMethod(javaObj, javaMethod, string1, string2);
 	} while (false);
 
 	if (jniEnv) {

@@ -104,6 +104,8 @@ public class CameraFragment extends Fragment implements PreviewCallback {
 	@Override
 	public void onPause() {
 		stopCamera();
+		stopSendData();
+		release();
 		super.onPause();
 	}
 	
@@ -222,6 +224,11 @@ public class CameraFragment extends Fragment implements PreviewCallback {
 	public synchronized void stopSendData() {
 		isSendingData = false;
 		h264Encoder.stop();
+	}
+	
+	private synchronized void release() {
+		if(h264Encoder != null)
+			h264Encoder.release();
 	}
 	
 	private void initH264Encoder() {

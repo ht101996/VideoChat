@@ -3,7 +3,6 @@ package com.arcsoft.ais.arcvc.activity;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +11,7 @@ import java.util.Map;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.FragmentTransaction;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -23,34 +23,28 @@ import android.media.MediaFormat;
 import android.media.MediaRecorder.AudioSource;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Handler;
 import android.os.Message;
-import android.app.FragmentTransaction;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Menu;
-import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.RelativeLayout.LayoutParams;
 
 import com.arcsoft.ais.arcvc.R;
 import com.arcsoft.ais.arcvc.fragment.CameraFragment;
+import com.arcsoft.ais.arcvc.jni.P2PClient;
 import com.arcsoft.ais.arcvc.utils.CameraUtils;
 import com.arcsoft.ais.arcvc.utils.Configer;
 import com.arcsoft.ais.arcvc.utils.DensityUtil;
 import com.arcsoft.ais.arcvc.utils.Global;
 import com.arcsoft.ais.arcvc.utils.MyBitmap;
 import com.arcsoft.ais.arcvc.utils.P2PClientManager;
-import com.arcsoft.ais.arcvc.utils.SocketUtils;
 import com.arcsoft.ais.arcvc.utils.audio.receiver.AudioPlayer;
-import com.arcsoft.videochat.mediarecorder.AudioRecorderWrapper;
-import com.es.app.videochat.recorder.ESRecordListener.OnEncoderListener;
-import com.es.app.videochat.recorder.H264Decoder;
-import com.es.app.videochat.recorder.MediaMuxerWrapper;
-import com.es.app.videochat.recorder.TimeMonitor;
 
 public class VideoChatActivity extends Activity implements View.OnClickListener{
 	private final String tag = VideoChatActivity.class.getSimpleName();
@@ -62,14 +56,8 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	static List<String> peerIdsOfFriends;
 	static ImageView iv_friend;
 	static SurfaceView surfaceView_myself;
-//	static DialogAdapter dialogAdapter;
-//	private static Camera myCamera;
-//	private static MediaRecorder mMediaRecorder;
-//	private AudioRecorderWrapper mAudioRecorderWrapper;
-//	private static MediaRecorder mMediaAudioRecorder;
-//	private static boolean usingCam = false;
-	private static Dialog applyAlertDialog;
-//	private static AudioWrapper audioWrapper;
+	private Dialog applyAlertDialog;
+	private P2PClient p2pClient;
 	boolean isFriendVideoZoomIn = false ;
 	boolean isMyselfVideoZoomIn = false ;
 	static long friendUserId;
@@ -83,21 +71,16 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		setContentView(R.layout.activity_video_chat);
 		getUserInfo();
 		initUI();
-		
-		
 		// startRTPSession
-		P2PClientManager.getP2PClientInstance().startRTPSession(remotePeerId);
-		P2PClientManager.getP2PClientInstance().addHandler(handler);
-
-		
-//		audioWrapper = AudioWrapper.getInstance();
-		
-		//保持屏幕常亮 
+		initP2PClien();
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-//		initMediaConfig();
-		Log.i(Global.TAG, "VideoActivity: onCreate============finished!");
 	}
 
+	private void initP2PClien() {
+		p2pClient = P2PClientManager.getP2PClientInstance();
+		p2pClient.startRTPSession(remotePeerId);
+	}
+	
 	private void getUserInfo() {
 		Intent intent = getIntent();
 		friendUserId = intent.getLongExtra("friendUserId", 0l);
@@ -116,10 +99,21 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		Log.i(Global.TAG, "remotePeerId>>>..." + remotePeerId);
 	}
 	
+	private View startBtn, stopBtn, requestBtn;
 	private void initUI() {
 		setTitle(getTitle()+" with "+friendNickname);
-		findViewById(R.id.startBtn).setOnClickListener(this);
-		findViewById(R.id.stopBtn).setOnClickListener(this);
+		AlertDialog.Builder applyAlertDialogBuilder = new AlertDialog.Builder(this);
+		applyAlertDialog = applyAlertDialogBuilder.setTitle("Video Chatting Request").setIcon(android.R.drawable.ic_dialog_info)
+				.setMessage("waiting for your friend to accept it ...").create();
+		startBtn =findViewById(R.id.startBtn);
+		startBtn.setOnClickListener(this);
+		
+		stopBtn = findViewById(R.id.stopBtn);
+		stopBtn.setOnClickListener(this);
+		stopBtn.setEnabled(false);
+		
+		requestBtn = findViewById(R.id.requestBtn);
+		requestBtn.setOnClickListener(this);
 		mPlaybackView = (TextureView) findViewById(R.id.PlaybackView);
 		addCameraFragment();
 	}
@@ -129,15 +123,30 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		switch (v.getId()) {
 		case R.id.startBtn:
 			startChat();
-			v.setVisibility(View.INVISIBLE);
-			break;
+			v.setEnabled(false);
+			stopBtn.setEnabled(true);
+			break; 
 		case R.id.stopBtn:
 			stopChat();
+			v.setEnabled(false);
+			startBtn.setEnabled(true);
+			break;
+		case R.id.requestBtn:
+//			requestChat();
 			break;
 		default:
 			break;
 		}
 		
+	}
+	
+	private void setButtonState(int processState) {
+		//TODO
+	}
+	private void requestChat() {
+		if(applyAlertDialog != null)
+			applyAlertDialog.show();
+		p2pClient.requestVideoChat(remotePeerId);
 	}
 	
 	private void addCameraFragment() {
@@ -403,14 +412,15 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
         return correctedPts;
     }
 	private void stopChat() {
+		bSendingAudio = false;
 		if(cameraFragment == null)
 			return;
 		cameraFragment.stopSendData();
-		FragmentTransaction ft = getFragmentManager().beginTransaction();
-		ft.remove(cameraFragment);
-		ft.commit();
-		cameraFragment = null;
-		bSendingAudio = false;
+//		FragmentTransaction ft = getFragmentManager().beginTransaction();
+//		ft.remove(cameraFragment);
+//		ft.commit();
+//		cameraFragment = null;
+		
 	}
 	
 
@@ -419,7 +429,6 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	protected void onResume() {
 		super.onResume();
 		Log.i(Global.TAG, "VideoActivity --------------onResume!");
-		P2PClientManager.getP2PClientInstance().addHandler(handler);
 	};
 
 	@Override
@@ -427,7 +436,6 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		super.onPause();
 		Log.i(Global.TAG, "VideoActivity --------------onPause!");
 		bSendingAudio = false;
-		P2PClientManager.getP2PClientInstance().removeHandler(handler);
 //		releaseMediaRecorder();
 //		mAudioRecorderWrapper.releaseRecorder();
 	};
@@ -436,7 +444,6 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	protected void onStop() {
 		super.onStop();
 		Log.i(Global.TAG, "VideoActivity --------------onStop!");
-		P2PClientManager.getP2PClientInstance().removeHandler(handler);
 //		releaseMediaRecorder();
 	};
 
@@ -464,23 +471,28 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	@Override
 	protected void onDestroy() {
 		Log.i(Global.TAG, " --------------onDestroy!");
-		try {
-			// P2PClientManager.getP2PClientInstance().uninit();
-			P2PClientManager.getP2PClientInstance().removeHandler(handler);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		SocketUtils.releaseLocalSocket();
+//		SocketUtils.releaseLocalSocket();
 //		releaseMediaRecorder();
 		super.onDestroy();
 	}
 
-	@Override
-	public void onBackPressed() {
-		super.onBackPressed();
-		finish();
-	}
+//	@Override
+//	public void onBackPressed() {
+////		super.onBackPressed();
+//		finish();
+//	}
 
+	@Override
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		Log.d(tag, "onKeyUp, keyCode="+keyCode+", event.isTracking():"+event.isTracking()+", event.isCanceled():"+event.isCanceled());
+		if(keyCode == KeyEvent.KEYCODE_BACK) {
+			finish();
+			return true;
+		}
+		else
+		return super.onKeyUp(keyCode, event);
+	}
+	
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		// Inflate the menu; this adds items to the action bar if it is present.
@@ -513,116 +525,6 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 //		view.setLayoutParams(mParams);
 //		view.set
 	}
-//	public void onEndClickEvent(View view) {
-//		Log.i(Global.TAG, "onEndClickEvent>>>from peerId=======" + currentPeerId);
-//		(new Thread() {
-//			public void run() {
-//				String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST,Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_END,"End");
-//				P2PClientManager.getP2PClientInstance().sendMsg(remotePeerId, message);
-////				releaseMediaRecorder();
-////				releaseCamera();
-//				CameraUtils.setUsingCam(false) ;
-////				audioWrapper.stopRecord();
-////				usingCam = false;
-//			}
-//		}).start();
-//	}
-
-//	public void onApplyClickEvent(View view) {
-//		
-//		Log.i(Global.TAG, "onApplyClickEvent>>>from peerId=======" + currentPeerId);
-//		Log.i(Global.TAG, "onApplyClickEvent>>>..to peerId======" + remotePeerId);
-//		String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST, Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_APPLY, "Apply");
-//		P2PClientManager.getP2PClientInstance().sendMsg(remotePeerId, message);
-//
-//		AlertDialog.Builder applyAlertDialogBuilder = new AlertDialog.Builder(VideoChatActivity.this);
-//		applyAlertDialog = applyAlertDialogBuilder.setTitle("Video Chatting Request").setIcon(android.R.drawable.ic_dialog_info)
-//				.setMessage("waiting for your friend to accept it ...").create();
-//		applyAlertDialog.show();
-//		Log.i(Global.TAG, "applyAlertDialogBuilder.show()====");
-//		Log.i(Global.TAG, "onApplyClickEvent====");
-//		
-//	}
-	
-
-//	@SuppressLint("NewApi")
-//	public void startCameraRecording() {
-//		Log.i(Global.TAG, " --------------startCameraRecording start!");
-//
-//		if (!CameraUtils.isUsingCam()) {
-//			CameraUtils.setUsingCam(true) ;
-////			usingCam = true;
-//			SocketUtils.initLocalSocket();
-//
-//			if (myCamera == null) {
-//				myCamera = CameraUtils.getNewCameraInstance();
-//				myCamera.setDisplayOrientation(90);//90
-////				myCamera.setDisplayOrientation(getCameraDisplayOrientationDegrees(myCamera));//90
-//
-//			}
-//
-//			if (CameraUtils.getVideoConfig() == null) {
-//				try {
-//					CameraUtils.getSPSPPS(surfaceView_myself);
-//				} catch (IOException e) {
-//					e.printStackTrace();
-//				}
-//			}
-//
-//			myCamera.unlock();
-//			mMediaRecorder = CameraUtils.initMediaRecorder(surfaceView_myself,mMediaRecorder,myCamera);
-////			mMediaAudioRecorder = CameraUtils.initAudioRecorder(mMediaAudioRecorder);
-//			
-//			try {
-//				mMediaRecorder.prepare();
-////				mMediaAudioRecorder.prepare();
-//			} catch (IllegalStateException e) {
-//				e.printStackTrace();
-//			} catch (IOException e) {
-//				e.printStackTrace();
-//			} 
-//			mMediaRecorder.start();
-//			CameraUtils.startVideoRecording();
-//			
-////			mMediaAudioRecorder.start();
-//			mAudioRecorderWrapper.startRecorder();
-//			CameraUtils.startAudioRecording();
-//			
-//		} else {
-//			Log.i(Global.TAG, " --------------now playing!");
-//		}
-//		Log.i(Global.TAG, " --------------startCameraRecording end!");
-//	}
-    
-	private final MyHandler handler = new MyHandler(this);
-
-	public Handler getHandler() {
-		return handler;
-	}
-
-	private  class MyHandler extends Handler {
-
-		// private static Handler handler = new Handler() {
-		private final WeakReference<Activity> myActivity;
-
-		public MyHandler(VideoChatActivity activity) {
-			myActivity = new WeakReference<Activity>(activity);
-		}
-
-		@Override
-		public void handleMessage(Message msg) {
-			//Log.i(Global.TAG, "VideoActivity Handler handleMessage>>>..start====== ");
-			//Log.i(Global.TAG, "VideoActivity Handler handleMessage>>>..msg.what====== " + msg.what);
-			VideoChatActivity activity = (VideoChatActivity) myActivity.get();
-			if (activity != null) {
-				// handleMessage
-			}
-			if (msg!=null) {
-				handlerHandleMsg(msg);
-			}
-		}
-
-	};
 
 	private void handlerHandleMsg(Message msg) {
 //		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd-HH:mm:ss", Locale.US);
@@ -653,14 +555,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 							.setPositiveButton("Accept", new DialogInterface.OnClickListener() {
 								@Override
 								public void onClick(DialogInterface dialog, int which) {
-									// 转跳到另外一个Activity
-									//Log.i(Global.TAG, "p2p sendMsg>>>..from peerId======" + currentPeerId);
-									//Log.i(Global.TAG, "p2p sendMsg>>>..to peerId======" + remotePeerId);
-									String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST,
-											Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_ACCEPT, "Accept");
-									P2PClientManager.getP2PClientInstance().sendMsg(remotePeerId, message);
-//									startCameraRecording();
-									//Log.i(Global.TAG, "Accept====");
+									P2PClientManager.getP2PClientInstance().acceptVideoChat(remotePeerId);
 								}
 							}).setNegativeButton("Reject", new DialogInterface.OnClickListener() {
 								public void onClick(DialogInterface dialog, int which) {

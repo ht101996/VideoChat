@@ -94,7 +94,6 @@ public class TextActivity extends Activity implements View.OnClickListener {
 		P2PClientManager.getP2PClientInstance().startRTPSession(remotePeerId);
 		Log.i(Global.TAG, "P2PClient.startRTPSession() sucessfully");
 
-		P2PClientManager.getP2PClientInstance().addHandler(handler);
 
 		mScrollView = (ScrollView) findViewById(R.id.scrollContent);
 		// mScrollView.setVerticalScrollBarEnabled(false);//禁用垂直滚动条
@@ -150,32 +149,25 @@ public class TextActivity extends Activity implements View.OnClickListener {
 		listView.setLayoutParams(params);
 	}
 
-	@Override
-	protected void onStart() {
-		super.onStart();
-		Log.i(Global.TAG, "VideoActivity --------------onStart!");
-		P2PClientManager.getP2PClientInstance().addHandler(handler);
-	};
 
 	@Override
 	protected void onResume() {
 		super.onResume();
 		Log.i(Global.TAG, "VideoActivity --------------onResume!");
-		P2PClientManager.getP2PClientInstance().addHandler(handler);
+//		P2PClientManager.getP2PClientInstance().addHandler(handler);
 	};
 
 	@Override
 	protected void onPause() {
 		super.onPause();
 		Log.i(Global.TAG, "VideoActivity --------------onPause!");
-		P2PClientManager.getP2PClientInstance().removeHandler(handler);
+//		P2PClientManager.getP2PClientInstance().removeHandler(handler);
 	};
 
 	@Override
 	protected void onStop() {
 		super.onStop();
 		Log.i(Global.TAG, "VideoActivity --------------onStop!");
-		P2PClientManager.getP2PClientInstance().removeHandler(handler);
 	};
 
 	@Override
@@ -242,7 +234,7 @@ public class TextActivity extends Activity implements View.OnClickListener {
 		Log.i(Global.TAG, " --------------onDestroy!");
 		try {
 			// P2PClientManager.getP2PClientInstance().uninit();
-			P2PClientManager.getP2PClientInstance().removeHandler(handler);
+//			P2PClientManager.getP2PClientInstance().removeHandler(handler);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

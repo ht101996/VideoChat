@@ -4,29 +4,50 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
-
 import com.arcsoft.ais.arcvc.utils.Global;
 
 
-import android.os.Bundle;
 import android.os.Environment;
-import android.os.Handler;
-import android.os.Message;
-import android.util.Log;
 
 public class P2PClient {
 	public static final String TAG = "P2PClient";
-	static Set<Handler> handlersList = new HashSet<Handler>();
 	
 	static {
 //		System.loadLibrary("ffmpeg");
 		System.loadLibrary("P2PClient");
 	}
-
+	private DateReceivedListener dataListener;
+	private OnlineStateDetectionListener onlineStateDetectionListener;
+	
 	public interface DateReceivedListener{
 		public void onH264DataReceived(byte[] data, int offset, int length, double timestamp);
 		public void onAACDataReceived(byte[] data, int offset, int length, double timestamp);
+		public void onStringMsgReceived(String remoteGPID, String msg);
+	}
+	public interface OnlineStateDetectionListener{
+		public void onAckDetected(String arg1, String arg2);
+		public void onheartbeatDetected(String arg1, String arg2);
+	}
+	
+	public void requestVideoChat(String destGPID) {
+		String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST, Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_APPLY, "Apply");
+		sendMsg(destGPID, message);
+	}
+	
+	public void rejectVideoChat(String destGPID) {
+		String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST,
+				Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_REJECT, "Reject");
+		sendMsg(destGPID, message);
+	}
+	
+	public void acceptVideoChat(String destGPID) {
+		String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST, Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_ACCEPT, "Accept");
+		sendMsg(destGPID, message);
+	}
+	
+	public void stopVideoChat(String destGPID) {
+		String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST,Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_END,"End");
+		sendMsg(destGPID, message);
 	}
 	
 	/**
@@ -113,55 +134,16 @@ public class P2PClient {
 		send264Packet(packetType, nalu, timestampUs);
 	}
 	
-	/**
-	 * invoked by jni, when received a msg, show on the UI
-	 * 
-	 * @param gpid
-	 * @param msg
-	 */
-	public static void onMsgReceive(String gpid, String msg) {
-		//Log.i(Global.TAG, "onMsgReceive gpid=" + gpid);
-		//Log.i(Global.TAG, "onMsgReceive msg=" + msg);
-		Message m = new Message();
-		Map<String, String> msgMap = Global.parseMsg(msg);
-		String msgType = msgMap.get("msg_type");
-		if (Global.MSG_TYPE_ONLINE_STATUS_DETECT.equals(msgType)) {
-			m.what = 3;
-		} else {
-			m.what = 1;
-		}
-		Bundle bundle = new Bundle();
-		bundle.putString("msg", msg);
-		bundle.putString("gpid", gpid);
-		Log.i(TAG, "onMsgReceive m.what,GPID,MSG=" + m.what+ ","+ gpid+ ","+msg);
-		//Log.i(Global.TAG, "onMsgReceive handlersList.size()=" + handlersList.size());
-		m.setData(bundle);
-		for (Handler handler : handlersList) {
-			handler.sendMessage(m);//Pushes a message
-			Log.i(TAG, "handler=" + handler.getClass());
-		}
-	}
 	
-	public static void onVideoReceive(int[] value, int width, int height) {
-		Message m = new Message();
-		m.what = 2;
-		Bundle bundle = new Bundle();
-		bundle.putIntArray("packet", value);
-		bundle.putInt("width", width);
-		bundle.putInt("height", height);
-		m.setData(bundle);
-
-		for (Handler handler : handlersList) {
-			handler.sendMessage(m);//Pushes a message
-			//Log.i(Global.TAG, "handler=" + handler.getClass());
-		}
-	}
 	
-	private DateReceivedListener dataListener;
 	public void setDateReceivedListener(DateReceivedListener listener) {
 		this.dataListener = listener;
 	}
+	public void setOnlineStateDetectionListener(OnlineStateDetectionListener listener) {
+		this.onlineStateDetectionListener = listener;
+	}
 	
+	//invoked by jni when received H264 data
 	public void receiveH264Data(byte[] data, int offset, int length, double timestamp) {
 //		output(data);
 		if(dataListener != null)
@@ -174,31 +156,27 @@ public class P2PClient {
 			dataListener.onAACDataReceived(data, offset, length, timestamp);
 	}
 	
-	public static void onAudioReceive(byte[] value) {
-		Message m = new Message();
-		m.what = 5;
-		Bundle bundle = new Bundle();
-		bundle.putByteArray("packet", value);
-		m.setData(bundle);
-
-		for (Handler handler : handlersList) {
-			handler.sendMessage(m);//Pushes a message
-			//Log.i(Global.TAG, "handler=" + handler.getClass());
+	// invoked by jni, when received a string message
+	public void receiveStringMsg(String remoteGPID, String msg) {
+		Map<String, String> msgMap = Global.parseMsg(msg);
+		String msgType = msgMap.get("msg_type");
+		if (Global.MSG_TYPE_ONLINE_STATUS_DETECT.equals(msgType)) {
+			System.out.println("cxd, msg:"+msg);
+			String msgCode = msgMap.get("msg_code");
+			if (Global.MSG_TYPE_ONLINE_STATUS_DETECT_ACK.equals(msgCode)) {
+				String str[] = msgMap.get("msg").split(",");
+				if(onlineStateDetectionListener != null)
+					onlineStateDetectionListener.onAckDetected(str[0], str[1]);
+			}else if(Global.MSG_TYPE_ONLINE_STATUS_DETECT_HEARTBEAT.equals(msgCode)){
+				String str[] = msgMap.get("msg").split(",");
+        		String message = Global.catMsg(Global.MSG_TYPE_ONLINE_STATUS_DETECT , Global.MSG_TYPE_ONLINE_STATUS_DETECT_ACK, str[0] + "," + str[1]);
+        		if(onlineStateDetectionListener != null)
+					onlineStateDetectionListener.onAckDetected(str[1], message);
+			}
+		} else {
+			if(dataListener != null)
+				dataListener.onStringMsgReceived(remoteGPID, msg);
 		}
-	}
-	public void addHandler(Handler handler){
-		Log.i(TAG, "addHandler=");
-		handlersList.add(handler);
-		for (Handler handler1 : handlersList) {
-			Log.i(TAG, "handler1=" + handler1.getClass());
-		}
-	}
-
-	public void removeHandler(Handler handler){
-		Log.i(TAG, "removeHandler=");
-		handlersList.remove(handler);
-		for (Handler handler1 : handlersList) {
-			Log.i(TAG, "handler1=" + handler1.getClass());
-		}
+		
 	}
 }

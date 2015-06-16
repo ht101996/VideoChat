@@ -1,10 +1,21 @@
 登录：
  /asserts/config.ini配置相关信息；
  会做时间戳验证
+SR是SenderReport， 是发送方发给接收方的。 所以是接收方收到。 RR相反
+
+
+
+
 
 
 已知问题：
+
 getnextpacket 会crash
+
 client unknit crash
+
 RR出现一样的记录的bug
+
 断网的提示函数
+setOnlineStatus(userId
+

@@ -43,9 +43,14 @@ public class MediaDataCenter{
 		public void run() {
 			while(true) {
 				if(! AudioStreamDataQueue.isEmpty()) {
+					try{
 					AudioStreamData audioData = AudioStreamDataQueue.poll();
 					audioPTS = (long)audioData.getTimestamp() * 1000000;
 					mAudioDecoder.decode(audioData.getData(), audioPTS);
+					}catch(Exception e) {
+						e.printStackTrace();
+						Log.e(Tag, "!!!!!!!!!!!!!! AudioDecodeThread error");
+					}
 				}
 			}
 		}
@@ -55,16 +60,19 @@ public class MediaDataCenter{
 		@Override
 		public void run() {
 			while(true) {
-				if(! VideoFrameItemQueue.isEmpty()) {
+				boolean  videoEmpty = VideoFrameItemQueue.isEmpty();
+				if(! videoEmpty) {
+					try{
 					VideoFrameItem videoFrame = VideoFrameItemQueue.peek();
 					long videoPTS = (long)videoFrame.getTimestamp() * 1000000; 
 					long VAInterval = videoPTS - audioPTS;
 					if(VAInterval > 500000){
-						try {
+						try{
 							Thread.sleep(50);
-						} catch (InterruptedException e) {
+						}catch(InterruptedException e){
 							e.printStackTrace();
 						}
+						
 						Log.d(Tag, "VAInterval > 500000, Video="+videoPTS+"   audio="+audioPTS);
 					}
 					else if(VAInterval < -500000) {
@@ -78,6 +86,9 @@ public class MediaDataCenter{
 						mVideoDecoder.decode(videoFrame.getData(), videoPTS);
 					}
 						
+					}catch(Exception e) {
+						e.printStackTrace();
+					}
 				}
 			}
 		}

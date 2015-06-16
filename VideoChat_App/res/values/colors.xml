@@ -2,4 +2,5 @@
 <resources>
     <color name="btn_register_normal">#22ACE4</color>
     <color name="lightblue">#3A9BFF</color>
+    <color name="gray">#AAAAAA</color>
 </resources>

@@ -176,6 +176,8 @@ public class OnlineStatusDetector implements Runnable {
     	//Log.i(Global.TAG, "OnlineStatusDetector setOnlineStatus===peerId=" + peerId);
     	//Log.i(Global.TAG, "OnlineStatusDetector setOnlineStatus===onlineStatus=" + onlineStatus);
 		FriendOnlineStatus friendOnlineStatus = friendOnlineStatusMap.get(userId) ;
+		if(friendOnlineStatus == null)
+			return;
 		//Log.i(Global.TAG, "detect getUserId: " + friendOnlineStatus.getUserId());
 		//Log.i(Global.TAG, "detect getNickname: " + friendOnlineStatus.getNickname());
 		friendOnlineStatus.setReceivedMsgFlag(Global.RECEIVED_MSG_FLAG_YES);

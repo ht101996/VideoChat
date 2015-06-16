@@ -312,6 +312,7 @@ void AVBaseRTPSession::OnRTCPCompoundPacket(RTCPCompoundPacket *pack,const RTPTi
 
     RTCPPacket *rtcppack;
     pack->GotoFirstPacket();
+    LOGD("Got OnRTCPCompoundPacket start");
     while ((rtcppack = pack->GetNextPacket()) != 0)
     {
         if (rtcppack->IsKnownFormat())
@@ -339,10 +340,14 @@ void AVBaseRTPSession::OnRTCPCompoundPacket(RTCPCompoundPacket *pack,const RTPTi
                   case RTCPPacket::RR:
                   {
                       RTCPRRPacket *p = (RTCPRRPacket *)rtcppack;
+                      int num = p->GetReceptionReportCount();
+					  if(num == 0)
+						   return;
+
                       int index = 0;
 
                       unsigned int rtt = ((receivetime.ntptimetran() - p->GetLSR(index) - p->GetDLSR(index))*1000)/65536;
-                      LOGD("Got RR  lostrate %d, lostpkt %d, jitter %u, rtt %u \n",
+                      LOGD("Got RR  lostrate %d%%, lostpkt %d, jitter %ums, rtt %ums \n",
                            p->GetFractionLost(index),
                            p->GetLostPacketCount(index),
                            p->GetJitter(index) * 1000 / 65536,

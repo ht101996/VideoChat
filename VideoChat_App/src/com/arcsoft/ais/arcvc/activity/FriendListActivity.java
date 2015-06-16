@@ -34,10 +34,10 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.arcsoft.ais.arcvc.R;
-import com.arcsoft.ais.arcvc.activity.VideoActivity.StartCameraRecording;
 import com.arcsoft.ais.arcvc.adapter.ViewAdapter;
 import com.arcsoft.ais.arcvc.bean.FriendOnlineStatus;
 import com.arcsoft.ais.arcvc.bean.PeerIdOnlineStatus;
+import com.arcsoft.ais.arcvc.jni.P2PClient;
 import com.arcsoft.ais.arcvc.utils.Configer;
 import com.arcsoft.ais.arcvc.utils.Global;
 import com.arcsoft.ais.arcvc.utils.MyBitmap;
@@ -68,7 +68,19 @@ public class FriendListActivity extends Activity {
 	private static String friendNickname;
 	Map<String,FriendOnlineStatus> friendOnlineStatusMap = new HashMap<String,FriendOnlineStatus>();
 	List<Map<String, Object>> listItem = new ArrayList<Map<String, Object>>(); 
+	private P2PClient.OnlineStateDetectionListener onlineListener = new P2PClient.OnlineStateDetectionListener() {
 
+		@Override
+		public void onAckDetected(String arg0, String arg1) {
+			OnlineStatusDetector.setOnlineStatus(arg0, arg1, Global.FRIEND_ONLINE_STATUS_ONLINE);
+		}
+
+		@Override
+		public void onheartbeatDetected(String arg0, String arg1) {
+			P2PClientManager.getP2PClientInstance().sendMsg(arg0, arg1);
+		}
+		
+	};
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);		
@@ -154,7 +166,7 @@ public class FriendListActivity extends Activity {
 //		Log.i(Global.TAG, "getLocalGpid============" + localGpid);
 //		Configer.setValue("peer_id", localGpid);
 		currentPeerId = Configer.getValue("peer_id");
-		P2PClientManager.getP2PClientInstance().addHandler(handler);
+		P2PClientManager.getP2PClientInstance().setOnlineStateDetectionListener(onlineListener);
 		Log.i(Global.TAG, "FriendListActivity: onCreate============finished!");
 	}
 	
@@ -164,46 +176,13 @@ public class FriendListActivity extends Activity {
 		Thread mThread = new Thread(new OnlineStatusDetector(viewAdapter, listItem, this, friendOnlineStatusMap, handler, currentPeerId));
 	    mThread.start();
     }
-	@Override
-	protected void onStart(){
-		super.onStart();
-		Log.i(Global.TAG, "FriendListActivity --------------onStart!");
-		P2PClientManager.getP2PClientInstance().addHandler(handler);
-	}; 
 
 	@Override
 	protected void onResume(){
 		super.onResume();
 		Log.i(Global.TAG, "FriendListActivity --------------onResume!");
-		P2PClientManager.getP2PClientInstance().addHandler(handler);
 	}; 
 
-	@Override
-	protected void onPause(){
-		super.onPause();
-		Log.i(Global.TAG, "FriendListActivity --------------onPause!");
-		P2PClientManager.getP2PClientInstance().removeHandler(handler);
-	}; 
-
-	@Override
-	protected void onStop(){
-		super.onStop();
-		Log.i(Global.TAG, "FriendListActivity --------------onStop!");
-		P2PClientManager.getP2PClientInstance().removeHandler(handler);
-	}; 
-	
-	@Override
-	protected void onDestroy() {
-		Log.i(Global.TAG, "FriendListActivity --------------onDestroy!");
-		try {
-//			P2PClientManager.getP2PClientInstance().uninit();
-			Log.i(Global.TAG, " --------------onStart!");
-			P2PClientManager.getP2PClientInstance().removeHandler(handler);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		super.onDestroy();
-	}
 	
 	class ListViewListener implements OnItemClickListener{
 		@Override
