@@ -86,7 +86,7 @@ public class AudioSender implements Runnable {
 			AACNal nalu = new AACNal();
 			nalu.setPayload(data);
 			nalu.setPayloadLength(size);
-			P2PClientManager.getP2PClientInstance().sendAACPacket("", nalu);
+			P2PClientManager.getP2PClientInstance().sendAACESData(data, data.length, 0);
 			Log.d(Global.TAG, "sendData, naluData.length==" + nalu.getPayloadLength());
 			Log.e(Global.TAG, "sendData,data.length==" + data.length);
 		} catch (Exception e) {

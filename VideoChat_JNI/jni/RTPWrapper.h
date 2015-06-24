@@ -11,16 +11,8 @@
 #include "rtperrors.h"
 #include "rtcprrpacket.h"
 #include "rtcpsrpacket.h"
+#include "rtpaddress.h"
 
-#ifdef __cplusplus
-extern "C"{
-#endif
-
-#include "libswresample/swresample.h"
-
-#ifdef __cplusplus
-}
-#endif
 
 #define log_enable
 
@@ -121,6 +113,8 @@ protected:
     void ProcessRTPPacket(const RTPSourceData &srcdat, const RTPPacket &rtppack);
 	virtual void OnRTCPCompoundPacket(RTCPCompoundPacket *pack,const RTPTime &receivetime,
 	                                  const RTPAddress *senderaddress);
+	virtual void OnTimeout(RTPSourceData *srcdat);
+
 private:
     uint8_t			 m_type;
     VideoRTPSession* m_videoSess;

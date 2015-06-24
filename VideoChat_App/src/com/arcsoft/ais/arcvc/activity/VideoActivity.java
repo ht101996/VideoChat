@@ -12,6 +12,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.os.Bundle;
 import android.os.Handler;
@@ -20,6 +21,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.Surface;
 import android.view.TextureView;
+import android.view.TextureView.SurfaceTextureListener;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -37,7 +39,7 @@ import com.es.app.videochat.recorder.MediaDataCenter;
 
 
 public class VideoActivity extends Activity implements View.OnClickListener{
-
+	private final static String tag = VideoActivity.class.getSimpleName();
 	static Button button_pause ;
 	static String friendNickname;
 	static String currentNickname;
@@ -68,26 +70,23 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 		displayRotationDegree = getWindowManager().getDefaultDisplay()
 	                .getRotation();
 		 
-		Log.i(Global.TAG, "friendUserId= " + friendUserId);
-		Log.i(Global.TAG, "friendNickname= " + friendNickname);
+		Log.i(tag, "friendUserId= " + friendUserId);
+		Log.i(tag, "friendNickname= " + friendNickname);
 		for (String friendPeerId : friendPeerIds) {
-			Log.i(Global.TAG, "friendPeerId= " + friendPeerId);
+			Log.i(tag, "friendPeerId= " + friendPeerId);
 		}
 		currentPeerId = Configer.getValue("peer_id");
 		if (friendPeerIds == null || friendPeerIds.size() < 1) {
-			Log.i(Global.TAG, "friendPeerIds.size() == 0>>>...error !!");
+			Log.i(tag, "friendPeerIds.size() == 0>>>...error !!");
 		} else {
 			peerIdsOfFriends = friendPeerIds;
 			remotePeerId = friendPeerIds.get(0);
-			Log.i(Global.TAG, "friendPeerIds.get(0)>>>..." + friendPeerIds.get(0));
+			Log.i(tag, "friendPeerIds.get(0)>>>..." + friendPeerIds.get(0));
 		}
 		initUI();
 		initDecoders();
-		initP2PClien();
-		
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-		
-		Log.i(Global.TAG, "VideoActivity: onCreate============finished!");
+		Log.d(tag, "VideoActivity: oncreate============finished!");
 	}
 	
 	private void initUI() {
@@ -96,7 +95,31 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 		findViewById(R.id.stopBtn).setOnClickListener(this);
 		findViewById(R.id.requestBtn).setOnClickListener(this);
 		mPlaybackView = (TextureView) findViewById(R.id.PlaybackView);
-		
+		mPlaybackView.setSurfaceTextureListener(new SurfaceTextureListener() {
+			
+			@Override
+			public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+			}
+			
+			@Override
+			public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width,
+					int height) {
+			}
+			
+			@Override
+			public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+				return false;
+			}
+			
+			@Override
+			public void onSurfaceTextureAvailable(SurfaceTexture surface, int width,
+					int height) {
+				Log.d(tag, "onSurfaceTextureAvailable");
+//				h264Decoder.setupDecoder(new Surface(mPlaybackView.getSurfaceTexture()));
+//				h264Decoder.startDecoder();
+				startH264Decoder();
+			}
+		});
 		AlertDialog.Builder applyAlertDialogBuilder = new AlertDialog.Builder(this);
 		applyAlertDialog = applyAlertDialogBuilder.setTitle("Video Chatting Request").setIcon(android.R.drawable.ic_dialog_info)
 				.setMessage("waiting for your friend to accept it ...").create();
@@ -121,8 +144,11 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 		
 	}
 	private void initP2PClien() {
+		Log.d(tag, "p2pClient.startRTPSession============0!");
 		p2pClient = P2PClientManager.getP2PClientInstance();
+		Log.d(tag, "p2pClient.startRTPSession============1!");
 		p2pClient.startRTPSession(remotePeerId);
+		Log.d(tag, "p2pClient.startRTPSession============2!");
 		p2pClient.setDateReceivedListener(dateReceivedListener);
 	}
 
@@ -150,7 +176,7 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 
 	/** Check if this device has a camera */
 	private static boolean checkCameraHardware(Context context) {
-		Log.i(Global.TAG, "VideoActivity: Camera.getNumberOfCameras()============" + Camera.getNumberOfCameras());
+		Log.i(tag, "VideoActivity: Camera.getNumberOfCameras()============" + Camera.getNumberOfCameras());
 		if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)) {
 			// this device has a camera
 			return true;
@@ -164,24 +190,28 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 	@Override
 	protected void onResume() {
 		super.onResume();
-		Log.i(Global.TAG, "VideoActivity --------------onResume!");
+		initP2PClien();
+		mMediaDataCenter.start();
+		Log.d(tag, "VideoActivity: onResume============finished!");
 	};
 
 	@Override
 	protected void onPause() {
 		super.onPause();
-		Log.i(Global.TAG, "VideoActivity --------------onPause!");
-//		handler.removeMessages(what);//TODO remove msg if necessary
 		releaseMediaRecorder();
 		stopDecode();
+		p2pClient.uninit();
+		mMediaDataCenter.stop();
+		
 	};
 
 
 	@Override
 	public void onBackPressed() {
-		Log.i(Global.TAG, " --------------onBackPressed!");
+		Log.i(tag, " --------------onBackPressed!");
 //		super.onBackPressed();
 		p2pClient.uninit();
+		p2pClient = null;
 		finish();
 		// onDestroy();
 	}
@@ -194,22 +224,21 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 	}
 
 	public void onEndClickEvent(View view) {
-		Log.i(Global.TAG, "onEndClickEvent>>>from peerId=======" + currentPeerId);
+		Log.i(tag, "onEndClickEvent>>>from peerId=======" + currentPeerId);
 		(new Thread() {
 			public void run() {
 				p2pClient.stopVideoChat(remotePeerId);
 				releaseMediaRecorder();
-				CameraUtils.setUsingCam(false) ;
 			}
 		}).start();
 	}
 
 	public void onPauseClickEvent(View view) {
-		Log.i(Global.TAG, "onPauseClickEvent>>>from peerId=======" + currentPeerId);
+		Log.i(tag, "onPauseClickEvent>>>from peerId=======" + currentPeerId);
 
-		Log.i(Global.TAG, "onPauseClickEvent run=======" + currentPeerId);
+		Log.i(tag, "onPauseClickEvent run=======" + currentPeerId);
 		int ret = 1;//P2PClientManager.getP2PClientInstance().pausePlaying();
-		Log.i(Global.TAG, "onPauseClickEvent run======ret=" + ret);
+		Log.i(tag, "onPauseClickEvent run======ret=" + ret);
 		if (ret == 0) {//playing,change to pause
 			//@ TODO
 			button_pause.setText("Pause");
@@ -222,8 +251,8 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 	
 	public void onTextClickEvent(View view) {
 		
-		Log.i(Global.TAG, "onTextClickEvent>>>from peerId=======" + currentPeerId);
-		Log.i(Global.TAG, "onTextClickEvent>>>..to peerId======" + remotePeerId);
+		Log.i(tag, "onTextClickEvent>>>from peerId=======" + currentPeerId);
+		Log.i(tag, "onTextClickEvent>>>..to peerId======" + remotePeerId);
 
 	 	Intent intent = new Intent();
         intent.putExtra("friendUserId",friendUserId);   
@@ -235,49 +264,26 @@ public class VideoActivity extends Activity implements View.OnClickListener{
         startActivity(intent);
         /* 关闭当前的Activity */
         //finish();
-		Log.i(Global.TAG, "applyAlertDialogBuilder.show()====");
-		Log.i(Global.TAG, "onTextClickEvent====");
+		Log.i(tag, "applyAlertDialogBuilder.show()====");
+		Log.i(tag, "onTextClickEvent====");
 		
 	}
 
 	public void onApplyClickEvent(View view) {
 		
-		Log.i(Global.TAG, "onApplyClickEvent>>>from peerId=======" + currentPeerId);
-		Log.i(Global.TAG, "onApplyClickEvent>>>..to peerId======" + remotePeerId);
+		Log.i(tag, "onApplyClickEvent>>>from peerId=======" + currentPeerId);
+		Log.i(tag, "onApplyClickEvent>>>..to peerId======" + remotePeerId);
 		p2pClient.requestVideoChat(remotePeerId);
 
 		AlertDialog.Builder applyAlertDialogBuilder = new AlertDialog.Builder(VideoActivity.this);
 		applyAlertDialog = applyAlertDialogBuilder.setTitle("Video Chatting Request").setIcon(android.R.drawable.ic_dialog_info)
 				.setMessage("waiting for your friend to accept it ...").create();
 		applyAlertDialog.show();
-		Log.i(Global.TAG, "applyAlertDialogBuilder.show()====");
-		Log.i(Global.TAG, "onApplyClickEvent====");
+		Log.i(tag, "applyAlertDialogBuilder.show()====");
+		Log.i(tag, "onApplyClickEvent====");
 		
 	}
 	
-    public static int getCameraDisplayOrientationDegrees(Camera camera) {
-        android.hardware.Camera.CameraInfo info =
-                new android.hardware.Camera.CameraInfo();
-        android.hardware.Camera.getCameraInfo(CameraUtils.getCameraIndex(), info);
-        int degrees = 0;
-        switch (displayRotationDegree) {
-            case Surface.ROTATION_0: degrees = 0; break;
-            case Surface.ROTATION_90: degrees = 90; break;
-            case Surface.ROTATION_180: degrees = 180; break;
-            case Surface.ROTATION_270: degrees = 270; break;
-        }
-    
-        int result;
-        if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-            result = (info.orientation + degrees) % 360;
-            result = (360 - result) % 360;  // compensate the mirror
-        } else {  // back-facing
-            result = (info.orientation - degrees + 360) % 360;
-        }
-		Log.i(Global.TAG, "VideoActivity getCameraDisplayOrientationDegrees>>>..result:======" + result);
-        return result ;
-    }
-    
 
 
     private Handler mHandler = new Handler(){
@@ -328,9 +334,8 @@ public class VideoActivity extends Activity implements View.OnClickListener{
     							}).create().show();
 
     				} else if(msgCode.equals(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_END)){
-    					Log.i(Global.TAG, "msgCode  MSG_TYPE_VIDEO_CHATTING_REQUEST_END===="+msgCode);
+    					Log.i(tag, "msgCode  MSG_TYPE_VIDEO_CHATTING_REQUEST_END===="+msgCode);
     					releaseMediaRecorder();
-    					CameraUtils.setUsingCam(false) ;
     				}
 
     			}
@@ -350,13 +355,37 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 	private boolean aacDcoderStarted = false;
 	
 	private void initDecoders() {
-		h264Decoder = new H264Decoder(320, 240, 15);
+		h264Decoder = new H264Decoder(CameraUtils.previewSize_width, CameraUtils.previewSize_Height, 15);
 		aacDecoder = new AACDecoder();
-		mMediaDataCenter = MediaDataCenter.getInstance(aacDecoder, h264Decoder);
+		mMediaDataCenter = MediaDataCenter.getInstance(new MediaDataCenter.DataDecodeListener() {
+			
+			@Override
+			public void onVideoDataDecoding(byte[] data, long timestampUs) {
+				try{
+					h264Decoder.decode(data, timestampUs);
+				}catch(Exception e) {
+					e.printStackTrace();
+					h264Decoder.releaseDecoder();
+				}
+			}
+			
+			@Override
+			public void onAudioDataDecoding(byte[] data, long timestampUs) {
+				try{
+					aacDecoder.decode(data, timestampUs);
+				}catch(Exception e) {
+					e.printStackTrace();
+					aacDecoder.reset();
+				}
+				
+			}
+		});
 	}
-	private void startH264Decoder(Surface surface) {
-		if(!H264DecoderStarted) 
-			h264Decoder.setupDecoder(surface);
+	private void startH264Decoder() {
+		if(!H264DecoderStarted) {
+			h264Decoder.setupDecoder(new Surface(mPlaybackView.getSurfaceTexture()));
+			h264Decoder.startDecoder();
+		}
 		H264DecoderStarted = true;
 	}
 	private void stopH264Decoder() {
@@ -388,10 +417,10 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 		
 		@Override
 		public void onH264DataReceived(byte[] arg0, int offset, int length, double timestamp) {
-			if(!H264DecoderStarted) {
-				startH264Decoder(new Surface(mPlaybackView.getSurfaceTexture()));
-				
-			}
+//			if(!H264DecoderStarted) {
+//				startH264Decoder(new Surface(mPlaybackView.getSurfaceTexture()));
+//				
+//			}
 //			h264Decoder.onFrame(arg0, 0, length, timestamp);
 			mMediaDataCenter.addVideoFrame(new MediaDataCenter.VideoFrameItem(arg0, 0, length, timestamp));
 		}
@@ -411,10 +440,10 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 		}
 	};
 	
-	private void startChat() {
-		startH264Decoder(new Surface(mPlaybackView.getSurfaceTexture()));
-		startAACDecoder();
-	}
+//	private void startChat() {
+//		startH264Decoder();
+//		startAACDecoder();
+//	}
 	
 
 	

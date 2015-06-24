@@ -229,7 +229,7 @@ jint JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_pausePlaying
 }
 
 //init
-void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_init
+void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_nativeInit
 (JNIEnv * env, jobject clazz, jstring jiniDirPath)
 {
 	HRESULT hResult = GetCmcObject(&pIClient);
@@ -257,14 +257,11 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_init
 	javaObj = env->NewGlobalRef(clazz);
 }
 
-void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit
+void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_nativeUninit
   (JNIEnv * env, jobject clazz)
 {
-	LOGD("Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit Start!");
-	if (pIClient) {
-		pIClient->UnInit();
-		pIClient = NULL;
-	}
+	LOGD("Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit Start!!!!");
+
 	LOGD("Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit mark 1 ");
 	if (videoSession != NULL) {
 		VideoRTPSession* videoSess = videoSession->GetVideoRTPSession();
@@ -286,6 +283,10 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit
 	LOGD("Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit mark 3 ");
 	CORE_SAFEDELETE(videoSession);
 	CORE_SAFEDELETE(audioSession);
+	if (pIClient) {
+		pIClient->UnInit();
+		pIClient = NULL;
+	}
 	env->DeleteGlobalRef(javaObj);
 	LOGD("Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit mark 4 ");
 	memset(arrADTS, 0, sizeof(arrADTS));
@@ -298,6 +299,8 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit
 void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendMsg
 (JNIEnv * env, jobject clazz, jstring jgpid, jstring jmsg)
 {
+	if(pIClient == NULL)
+		return;
 	char *gpid = (char *)env->GetStringUTFChars(jgpid, 0);
 	char *msg = (char *)env->GetStringUTFChars(jmsg, 0);
 	HRESULT err = E_IF_OK;
@@ -314,11 +317,11 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendMsg
 		strcpy(pMsgBuf + sizeof(Uint32), msg);
 		struct tm* sendtime = localtime((time_t*)&systime);
 		err = pIClient->SendTo(pMsgBuf, msglen + sizeof(Uint32), pGPID, 0);
-		if (err == E_IF_OK) {
-            LOGD("Sendto success!\n");
-		} else {
-            LOGE("Sendto invalid! error # %d.\n", err);
-		}
+//		if (err == E_IF_OK) {
+//            LOGD("Sendto success!\n");
+//		} else {
+//            LOGE("Sendto invalid! error # %d.\n", err);
+//		}
 	}
 
 	env->ReleaseStringUTFChars(jgpid, gpid);
@@ -338,7 +341,6 @@ jstring JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_getLocalGpid(JNIEnv * e
 			sprintf(srcGPID + 2 * i, "%02x", (Uint8) GPID[i]);
 		}
 	}
-	LOGI("srcGPID: %s\n",srcGPID);
 	jstring string1 = env->NewStringUTF(srcGPID);
 	return string1;
 }
@@ -355,7 +357,7 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_startRTPSession
 		char *gpid = (char *)env->GetStringUTFChars(gpidOfRemotePeer, 0);
 		strcpy(g_destGPID, gpid);
 
-		LOGD("startRTPSession gpid: %s", gpid);
+		LOGD("startRTPSession Destination gpid: %s", gpid);
 
 		videoSequenceNum = audioSequenceNum = 0;
 		int status = 10;
@@ -379,22 +381,22 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_startRTPSession
 		sessparams->SetOwnTimestampUnit(1.0/10.0);
 		sessparams->SetAcceptOwnPackets(true);
 		transparams->SetPortbase(VIDEO_PORT);
-		sessparams->SetUsePollThread(true);
+//		sessparams->SetUsePollThread(true);
 		transparams->SetP2PInterface(pIClient);
 
 		videoSession = new AVBaseRTPSession(RTP_VIDEO_PAYLOAD_TYPE);
 		status = videoSession->Create(*sessparams, transparams, RTPTransmitter::NATTVLProto);
-		LOGI("videoSession send.Create status: %d", status);
+		LOGI("startRTPSession videoSession send.Create status: %d, LocalSSRC:%d", status, videoSession->GetLocalSSRC());
 		videoSession->SetVideoRTPSession(videoSess);
 		videoSession->SetAudioRTPSession(audioSess);
 
 		status = videoSession->AddDestination(addr2);
-		LOGI("videoSession sess.AddDestination status: %d", status);
+//		LOGI("videoSession sess.AddDestination status: %d", status);
 		videoSession->SetDefaultPayloadType(RTP_VIDEO_PAYLOAD_TYPE);//设置传输类型
 		videoSession->SetDefaultMark(true);		//设置位
 		videoSession->SetTimestampUnit(1.0/VIDEO_SAMPLING_RATE); //设置采样间隔
 		videoSession->SetDefaultTimestampIncrement(VIDEO_TIMESTAMP_INCREMENT);//设置时间戳增加间隔  (时间戳增加间隔 =采样频率/帧率)
-		LOGI("videoSession startRTPSession Done.");
+//		LOGI("videoSession startRTPSession Done.");
 #endif
 
 #ifdef _HAVE_AUDIO_
@@ -410,23 +412,23 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_startRTPSession
 		RTPSessionParams* audioSessParams = new RTPSessionParams();
 		audioSessParams->SetOwnTimestampUnit(1.0/10.0);
 		audioSessParams->SetAcceptOwnPackets(true);
-		audioSessParams->SetUsePollThread(true);
+//		audioSessParams->SetUsePollThread(true);
 
 		audioSession = new AVBaseRTPSession(RTP_AUDIO_PAYLOAD_TYPE);
 		status = audioSession->Create(*audioSessParams, audioTransParams, RTPTransmitter::NATTVLProto);
-		LOGI("audioSession send.Create status: %d", status);
+		LOGI("startRTPSession audioSession send.Create status: %d, localSSRC:%d", status, audioSession->GetLocalSSRC());
 		audioSession->SetVideoRTPSession(videoSess);
 		audioSession->SetAudioRTPSession(audioSess);
 
 		status = audioSession->AddDestination(addr2);
-		LOGI("audioSession sess.AddDestination status: %d", status);
+//		LOGI("audioSession sess.AddDestination status: %d", status);
 		audioSession->SetDefaultPayloadType(RTP_AUDIO_PAYLOAD_TYPE);//设置传输类型
 		audioSession->SetDefaultMark(true);		//设置位
 
 		audioSession->SetTimestampUnit(1.0/AUDIO_SAMPLING_RATE); //设置采样间隔 44100
 		audioSession->SetDefaultTimestampIncrement(AUDIO_TIMESTAMP_INCREMENT);//设置时间戳增加间隔 1024
 
-		LOGI("audioSession startRTPSession Done.");
+//		LOGI("audioSession startRTPSession Done.");
 
 		audioSess->SetVideoRTPSession(videoSess);
 		videoSess->SetAudioRTPSession(audioSess);
@@ -673,192 +675,192 @@ static inline int getNextAACFrameOffset(uint8_t* data, int len)
 	return ret;
 }
 
-static int outputIndex = 0;
-static int outputOrgIndex = 0;
-void SendAACNalu(aac_nal_t* nalHdr, RTPSession& sess) {
-	LOGI("SendAACNalu...start");
-
-	uint8_t* pSendbuf = nalHdr->p_payload; //发送数据指针
-	int buflen = 0;
-	char sendbuf[MAX_RTP_PKT_LENGTH] = {0};
-	int status;
-
-	while (nalHdr->i_payload > 0) {
-		LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-
-		if(0){
-							char desPath[256] = { 0 };
-							sprintf(desPath, "/sdcard/chatdump/audioOutOrg_%d.txt",
-									outputOrgIndex);
-							FILE *fp = fopen(desPath, "wb"); //wb 以二进制流写
-							if (fp) {
-								fwrite(nalHdr->p_payload, 1, nalHdr->i_payload, fp);
-								fclose(fp);
-								LOGD("cxd put %s", desPath);
-							}
-							outputOrgIndex ++;
-					}
-		buflen = getNextAACFrameOffset(nalHdr->p_payload, nalHdr->i_payload);
-		if (!buflen) {
-			LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-			int framelength = getFrameLength(nalHdr->p_payload);
-			buflen = nalHdr->i_payload >= framelength ? framelength : nalHdr->i_payload;
-		} else if (buflen < 0) {
-			LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-			buflen = nalHdr->i_payload;
-		}
-
-		pSendbuf = nalHdr->p_payload;
-		nalHdr->p_payload += buflen;
-		nalHdr->i_payload -= buflen;
-
-		if (stAACFrameBuf.buflen + buflen + 2 > MAX_AAC_FRAME_SIZE) {
-			LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-			memcpy(stAACFrameBuf.pBuf, stAACFrameBuf.pBuf + stAACFrameBuf.buflen - sizeof(arrADTS), sizeof(arrADTS));
-			stAACFrameBuf.buflen = sizeof(arrADTS);
-		}
-
-		/* put aac data into buffer */
-		memcpy(stAACFrameBuf.pBuf + stAACFrameBuf.buflen, pSendbuf, buflen);
-		stAACFrameBuf.buflen += buflen;
-		stAACFrameBuf.pBuf[stAACFrameBuf.buflen] = stAACFrameBuf.pBuf[stAACFrameBuf.buflen + 1] = 0;
-
-		/* get the first four bytes of adts header of the current aac stream */
-		if (!arrADTS[0] && stAACFrameBuf.buflen > sizeof(arrADTS)) {
-			memcpy(arrADTS, stAACFrameBuf.pBuf, sizeof(arrADTS));
-		}
-
-		while ((buflen = getNextAACFrameOffset(stAACFrameBuf.pBuf, stAACFrameBuf.buflen)) >= 0) {
-			if (buflen > 0) {
-				LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-				stAACFrameBuf.buflen -= buflen;
-				memmove(stAACFrameBuf.pBuf, stAACFrameBuf.pBuf + buflen, stAACFrameBuf.buflen);
-			}
-
-			LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-			stAACFrameBuf.framelength = getFrameLength(stAACFrameBuf.pBuf);
-			if (stAACFrameBuf.buflen >= stAACFrameBuf.framelength) {
-				if ((stAACFrameBuf.buflen - stAACFrameBuf.framelength) < ADTS_HEADER_LENGTH || isADTSHeader(stAACFrameBuf.pBuf + stAACFrameBuf.framelength) ||
-					(stAACFrameBuf.pBuf[stAACFrameBuf.framelength] == 0 && stAACFrameBuf.pBuf[stAACFrameBuf.framelength + 1] == 0)) {
-					LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-					pSendbuf = stAACFrameBuf.pBuf;
-					buflen = stAACFrameBuf.framelength;
-				} else {
-					LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-					buflen = getNextAACFrameOffset(stAACFrameBuf.pBuf + 1, stAACFrameBuf.buflen - 1);
-					if (buflen > 0) {
-						buflen += 1;
-						stAACFrameBuf.buflen -= buflen;
-					} else {
-						buflen = stAACFrameBuf.buflen - sizeof(arrADTS);
-						stAACFrameBuf.buflen = sizeof(arrADTS);
-					}
-					memmove(stAACFrameBuf.pBuf, stAACFrameBuf.pBuf + buflen, stAACFrameBuf.buflen);
-					stAACFrameBuf.framelength = 0;
-					stAACFrameBuf.pBuf[stAACFrameBuf.buflen] = stAACFrameBuf.pBuf[stAACFrameBuf.buflen + 1] = 0;
-					continue;
-				}
-			} else {
-				LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-				break;
-			}
-
-			int pos = 0;
-			struct  timeval    stCurTime;
-			gettimeofday( &stCurTime, NULL );
-			double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
-			++audioSequenceNum;
-
-//			FILE* flog = fopen("/mnt/sdcard/audioSend.log", "a");
-//			if (flog) {
-//				fprintf(flog, "SendAACNalu currentTime:%lf, SequenceNumber: %u\n", curtime, audioSequenceNum);
-//				fclose(flog);
+//static int outputIndex = 0;
+//static int outputOrgIndex = 0;
+//void SendAACNalu(aac_nal_t* nalHdr, RTPSession& sess) {
+//	LOGI("SendAACNalu...start");
+//
+//	uint8_t* pSendbuf = nalHdr->p_payload; //发送数据指针
+//	int buflen = 0;
+//	char sendbuf[MAX_RTP_PKT_LENGTH] = {0};
+//	int status;
+//
+//	while (nalHdr->i_payload > 0) {
+//		LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
+//
+//		if(0){
+//							char desPath[256] = { 0 };
+//							sprintf(desPath, "/sdcard/chatdump/audioOutOrg_%d.txt",
+//									outputOrgIndex);
+//							FILE *fp = fopen(desPath, "wb"); //wb 以二进制流写
+//							if (fp) {
+//								fwrite(nalHdr->p_payload, 1, nalHdr->i_payload, fp);
+//								fclose(fp);
+//								LOGD("cxd put %s", desPath);
+//							}
+//							outputOrgIndex ++;
+//					}
+//		buflen = getNextAACFrameOffset(nalHdr->p_payload, nalHdr->i_payload);
+//		if (!buflen) {
+//			LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
+//			int framelength = getFrameLength(nalHdr->p_payload);
+//			buflen = nalHdr->i_payload >= framelength ? framelength : nalHdr->i_payload;
+//		} else if (buflen < 0) {
+//			LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
+//			buflen = nalHdr->i_payload;
+//		}
+//
+//		pSendbuf = nalHdr->p_payload;
+//		nalHdr->p_payload += buflen;
+//		nalHdr->i_payload -= buflen;
+//
+//		if (stAACFrameBuf.buflen + buflen + 2 > MAX_AAC_FRAME_SIZE) {
+//			LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
+//			memcpy(stAACFrameBuf.pBuf, stAACFrameBuf.pBuf + stAACFrameBuf.buflen - sizeof(arrADTS), sizeof(arrADTS));
+//			stAACFrameBuf.buflen = sizeof(arrADTS);
+//		}
+//
+//		/* put aac data into buffer */
+//		memcpy(stAACFrameBuf.pBuf + stAACFrameBuf.buflen, pSendbuf, buflen);
+//		stAACFrameBuf.buflen += buflen;
+//		stAACFrameBuf.pBuf[stAACFrameBuf.buflen] = stAACFrameBuf.pBuf[stAACFrameBuf.buflen + 1] = 0;
+//
+//		/* get the first four bytes of adts header of the current aac stream */
+//		if (!arrADTS[0] && stAACFrameBuf.buflen > sizeof(arrADTS)) {
+//			memcpy(arrADTS, stAACFrameBuf.pBuf, sizeof(arrADTS));
+//		}
+//
+//		while ((buflen = getNextAACFrameOffset(stAACFrameBuf.pBuf, stAACFrameBuf.buflen)) >= 0) {
+//			if (buflen > 0) {
+//				LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
+//				stAACFrameBuf.buflen -= buflen;
+//				memmove(stAACFrameBuf.pBuf, stAACFrameBuf.pBuf + buflen, stAACFrameBuf.buflen);
 //			}
-
-			if (buflen <= MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH) { // 一包就能搞定
-				sess.SetDefaultMark(true); // 因为是最后一包，所以true
-
-				memcpy(sendbuf + pos, &curtime, sizeof(double));
-				pos += sizeof(double);
-				memcpy(sendbuf + pos, &audioSequenceNum, sizeof(uint32_t));
-				pos += sizeof(uint32_t);
-				memcpy(sendbuf + pos, pSendbuf, buflen);
-
-			if(0){
-				char desPath[256] = { 0 };
-					sprintf(desPath, "/sdcard/chatdump/audioOut_%d.txt",
-							outputIndex);
-					FILE *fp = fopen(desPath, "wb"); //wb 以二进制流写
-					if (fp) {
-						fwrite(pSendbuf, 1, buflen, fp);
-						fclose(fp);
-						LOGD("cxd put %s", desPath);
-					}
-					outputIndex ++;
-			}
-
-				status = sess.SendPacket((void *) sendbuf, buflen + pos);
-				LOGD("SendAACNalu status: %d, buflen: %d --------File: %s, Line: %d", status, buflen, __FILE__, __LINE__);
-			} else if (buflen > MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH) { // 分多包发送
-				//设置标志位Mark为0
-				sess.SetDefaultMark(false);
-
-				//send first RTP pkg
-				memcpy(sendbuf + pos, &curtime, sizeof(double));
-				pos += sizeof(double);
-				memcpy(sendbuf + pos, &audioSequenceNum, sizeof(uint32_t));
-				pos += sizeof(uint32_t);
-
-				memcpy(sendbuf + pos, pSendbuf, MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
-				status = sess.SendPacket((void *) sendbuf, MAX_RTP_PKT_LENGTH);
-				LOGD("SendH264Nalu status: %d, buflen: %d --------File: %s, Line: %d", status, buflen, __FILE__, __LINE__);
-
-				int restBufLen = buflen - (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
-				pSendbuf += (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
-
-				int k = 0, l = 0;
-				k = restBufLen / (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH); // 要分几个完整包
-				l = restBufLen % (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH); // 最后剩余的字节不足一个包
-
-				for (int i = 0; i < k; i++) {
-					if(i == (k-1) && l == 0) { // 因为是最后一包，所以true
-						sess.SetDefaultMark(true);
-					}
-					pos = 0;
-					memcpy(sendbuf + pos, &curtime, sizeof(double));
-					pos += sizeof(double);
-					memcpy(sendbuf + pos, &audioSequenceNum, sizeof(uint32_t));
-					pos += sizeof(uint32_t);
-
-					memcpy(sendbuf + pos, pSendbuf, MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
-					status = sess.SendPacket((void *) sendbuf, MAX_RTP_PKT_LENGTH);
-					pSendbuf += (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
-				}
-
-				if (l > 0) {
-					pos = 0;
-					memcpy(sendbuf + pos, &curtime, sizeof(double));
-					pos += sizeof(double);
-					memcpy(sendbuf + pos, &audioSequenceNum, sizeof(uint32_t));
-					pos += sizeof(uint32_t);
-
-					sess.SetDefaultMark(true); // 因为是最后一包，所以true
-					memcpy(sendbuf + pos, pSendbuf, l);
-					status = sess.SendPacket((void *) sendbuf, l + pos);
-				}
-			} else {
-				LOGI("I'm not ready for audio, sorry!!!buflen: %d\n", buflen);
-			}
-
-			buflen = 0;
-			stAACFrameBuf.buflen -= stAACFrameBuf.framelength;
-			memmove(stAACFrameBuf.pBuf, stAACFrameBuf.pBuf + stAACFrameBuf.framelength, stAACFrameBuf.buflen);
-			stAACFrameBuf.framelength = 0;
-		}
-	}
-
-	LOGI("SendAACNalu...end");
-}
+//
+//			LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
+//			stAACFrameBuf.framelength = getFrameLength(stAACFrameBuf.pBuf);
+//			if (stAACFrameBuf.buflen >= stAACFrameBuf.framelength) {
+//				if ((stAACFrameBuf.buflen - stAACFrameBuf.framelength) < ADTS_HEADER_LENGTH || isADTSHeader(stAACFrameBuf.pBuf + stAACFrameBuf.framelength) ||
+//					(stAACFrameBuf.pBuf[stAACFrameBuf.framelength] == 0 && stAACFrameBuf.pBuf[stAACFrameBuf.framelength + 1] == 0)) {
+//					LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
+//					pSendbuf = stAACFrameBuf.pBuf;
+//					buflen = stAACFrameBuf.framelength;
+//				} else {
+//					LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
+//					buflen = getNextAACFrameOffset(stAACFrameBuf.pBuf + 1, stAACFrameBuf.buflen - 1);
+//					if (buflen > 0) {
+//						buflen += 1;
+//						stAACFrameBuf.buflen -= buflen;
+//					} else {
+//						buflen = stAACFrameBuf.buflen - sizeof(arrADTS);
+//						stAACFrameBuf.buflen = sizeof(arrADTS);
+//					}
+//					memmove(stAACFrameBuf.pBuf, stAACFrameBuf.pBuf + buflen, stAACFrameBuf.buflen);
+//					stAACFrameBuf.framelength = 0;
+//					stAACFrameBuf.pBuf[stAACFrameBuf.buflen] = stAACFrameBuf.pBuf[stAACFrameBuf.buflen + 1] = 0;
+//					continue;
+//				}
+//			} else {
+//				LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
+//				break;
+//			}
+//
+//			int pos = 0;
+//			struct  timeval    stCurTime;
+//			gettimeofday( &stCurTime, NULL );
+//			double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
+//			++audioSequenceNum;
+//
+////			FILE* flog = fopen("/mnt/sdcard/audioSend.log", "a");
+////			if (flog) {
+////				fprintf(flog, "SendAACNalu currentTime:%lf, SequenceNumber: %u\n", curtime, audioSequenceNum);
+////				fclose(flog);
+////			}
+//
+//			if (buflen <= MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH) { // 一包就能搞定
+//				sess.SetDefaultMark(true); // 因为是最后一包，所以true
+//
+//				memcpy(sendbuf + pos, &curtime, sizeof(double));
+//				pos += sizeof(double);
+//				memcpy(sendbuf + pos, &audioSequenceNum, sizeof(uint32_t));
+//				pos += sizeof(uint32_t);
+//				memcpy(sendbuf + pos, pSendbuf, buflen);
+//
+//			if(0){
+//				char desPath[256] = { 0 };
+//					sprintf(desPath, "/sdcard/chatdump/audioOut_%d.txt",
+//							outputIndex);
+//					FILE *fp = fopen(desPath, "wb"); //wb 以二进制流写
+//					if (fp) {
+//						fwrite(pSendbuf, 1, buflen, fp);
+//						fclose(fp);
+//						LOGD("cxd put %s", desPath);
+//					}
+//					outputIndex ++;
+//			}
+//
+//				status = sess.SendPacket((void *) sendbuf, buflen + pos);
+//				LOGD("SendAACNalu status: %d, buflen: %d --------File: %s, Line: %d", status, buflen, __FILE__, __LINE__);
+//			} else if (buflen > MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH) { // 分多包发送
+//				//设置标志位Mark为0
+//				sess.SetDefaultMark(false);
+//
+//				//send first RTP pkg
+//				memcpy(sendbuf + pos, &curtime, sizeof(double));
+//				pos += sizeof(double);
+//				memcpy(sendbuf + pos, &audioSequenceNum, sizeof(uint32_t));
+//				pos += sizeof(uint32_t);
+//
+//				memcpy(sendbuf + pos, pSendbuf, MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
+//				status = sess.SendPacket((void *) sendbuf, MAX_RTP_PKT_LENGTH);
+//				LOGD("SendH264Nalu status: %d, buflen: %d --------File: %s, Line: %d", status, buflen, __FILE__, __LINE__);
+//
+//				int restBufLen = buflen - (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
+//				pSendbuf += (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
+//
+//				int k = 0, l = 0;
+//				k = restBufLen / (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH); // 要分几个完整包
+//				l = restBufLen % (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH); // 最后剩余的字节不足一个包
+//
+//				for (int i = 0; i < k; i++) {
+//					if(i == (k-1) && l == 0) { // 因为是最后一包，所以true
+//						sess.SetDefaultMark(true);
+//					}
+//					pos = 0;
+//					memcpy(sendbuf + pos, &curtime, sizeof(double));
+//					pos += sizeof(double);
+//					memcpy(sendbuf + pos, &audioSequenceNum, sizeof(uint32_t));
+//					pos += sizeof(uint32_t);
+//
+//					memcpy(sendbuf + pos, pSendbuf, MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
+//					status = sess.SendPacket((void *) sendbuf, MAX_RTP_PKT_LENGTH);
+//					pSendbuf += (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
+//				}
+//
+//				if (l > 0) {
+//					pos = 0;
+//					memcpy(sendbuf + pos, &curtime, sizeof(double));
+//					pos += sizeof(double);
+//					memcpy(sendbuf + pos, &audioSequenceNum, sizeof(uint32_t));
+//					pos += sizeof(uint32_t);
+//
+//					sess.SetDefaultMark(true); // 因为是最后一包，所以true
+//					memcpy(sendbuf + pos, pSendbuf, l);
+//					status = sess.SendPacket((void *) sendbuf, l + pos);
+//				}
+//			} else {
+//				LOGI("I'm not ready for audio, sorry!!!buflen: %d\n", buflen);
+//			}
+//
+//			buflen = 0;
+//			stAACFrameBuf.buflen -= stAACFrameBuf.framelength;
+//			memmove(stAACFrameBuf.pBuf, stAACFrameBuf.pBuf + stAACFrameBuf.framelength, stAACFrameBuf.buflen);
+//			stAACFrameBuf.framelength = 0;
+//		}
+//	}
+//
+//	LOGI("SendAACNalu...end");
+//}
 
 int GetJniObjectReferenceForAAC(JNIEnv *env, jobject jo, jobject odata, aac_nal_t& aacNal, jbyteArray* outPayload) {
 	/* Get a reference to obj's class */
@@ -882,28 +884,25 @@ int GetJniObjectReferenceForAAC(JNIEnv *env, jobject jo, jobject odata, aac_nal_
 		aacNal.i_payload = jPayLoadLength;
 	}
 	env->DeleteLocalRef(cls);
-//	LOGI("i_payload: %d" , aacNal.i_payload);
-//	LOGI("p_payload length: %d" , env->GetArrayLength((jbyteArray)jPayload));
 	return 1;
 }
 
-void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACPacket
-  (JNIEnv * env, jobject clazz, jstring jstring, jobject nal)
-{
-	LOGD("sendAACPacket,start... __LINE__: %d\n" , __LINE__);
-	aac_nal_t aacNal;
-	jbyteArray jpayload;
-	GetJniObjectReferenceForAAC(env, clazz, nal, aacNal, &jpayload);
-	SendAACNalu(&aacNal, *audioSession);
-	LOGD("destination gpid: %s, sendAACPacket, __LINE__: %d\n" , g_destGPID, __LINE__);
-	env->ReleaseByteArrayElements(jpayload, (jbyte*)aacNal.p_payload, 0);
-	env->DeleteLocalRef(jpayload);
-	LOGD("sendAACPacket,end... __LINE__: %d\n" , __LINE__);
-}
+//void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACPacket
+//  (JNIEnv * env, jobject clazz, jstring jstring, jobject nal)
+//{
+//	aac_nal_t aacNal;
+//	jbyteArray jpayload;
+//	GetJniObjectReferenceForAAC(env, clazz, nal, aacNal, &jpayload);
+//	SendAACNalu(&aacNal, *audioSession);
+//	LOGD("sendAACPacket destination gpid: %s, sendAACPacket, __LINE__: %d\n" , g_destGPID, __LINE__);
+//	env->ReleaseByteArrayElements(jpayload, (jbyte*)aacNal.p_payload, 0);
+//	env->DeleteLocalRef(jpayload);
+//}
 void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACESData
   (JNIEnv *env, jobject clazz, jbyteArray data, jint length, jlong timestamp)
 {
-	LOGD("sendAACESData start, buflen: %d --------, Line: %d", length, __LINE__);
+//	LOGD("sendAACESData start, buflen: %d --------, Line: %d", length, __LINE__);
+	LOGD("sendAACESData destination gpid: %s, __LINE__: %d\n" , g_destGPID, __LINE__);
 	if(data == NULL || length == 0)
 		return;
 	char sendbuf[MAX_RTP_PKT_LENGTH] = {0};
@@ -924,9 +923,6 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACESData
 			flag = false;
 		}
 		//add time stamp
-//		struct  timeval stCurTime;
-//		gettimeofday( &stCurTime, NULL);
-//		double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
 		double curtime = (double) timestamp / 1000000;
 		memcpy(sendbuf + desPos, &curtime, sizeof(double));
 		desPos += sizeof(double);
@@ -940,7 +936,7 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACESData
 		memcpy(sendbuf + desPos, pData + srcPos, packetSize - RTP_PKT_HEADER_LENGTH);
 		int status = audioSession->SendPacket((void *) sendbuf, packetSize);
 		srcPos += packetSize - RTP_PKT_HEADER_LENGTH;
-		LOGD("sendAACESData status: %d, buflen: %d, Mark = %d, Line: %d", status, packetSize, flag, __LINE__);
+//		LOGD("sendAACESData status: %d, buflen: %d, Mark = %d, Line: %d", status, packetSize, flag, __LINE__);
 
 		memset(sendbuf, 0, sizeof(char) * MAX_RTP_PKT_LENGTH);
 		desPos = 0;

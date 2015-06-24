@@ -1,6 +1,8 @@
 
 package com.es.app.videochat.recorder;
 
+import com.arcsoft.ais.arcvc.utils.CameraUtils;
+
 /**
  * A class that represents the quality of a video stream. 
  * It contains the resolution, the framerate (in fps) and the bitrate (in bps) of the stream.
@@ -8,7 +10,7 @@ package com.es.app.videochat.recorder;
 public class ESVideoQuality {
 
 	/** Default video stream quality. */
-	public final static ESVideoQuality DEFAULT_VIDEO_QUALITY = new ESVideoQuality(320,240,25,125000);
+	public final static ESVideoQuality DEFAULT_VIDEO_QUALITY = new ESVideoQuality(CameraUtils.previewSize_width, CameraUtils.previewSize_Height,25,125000);
 
 	/**	Represents a quality for a video stream. */ 
 	public ESVideoQuality() {}

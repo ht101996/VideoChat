@@ -5,18 +5,6 @@
 #include "inc/p2p_interface.h"
 #include "RTPWrapper.h"
 
-#ifdef __cplusplus
-extern "C"{
-#endif
-
-#include "libavformat/avformat.h"
-#include "libswscale/swscale.h"
-#include "libswresample/swresample.h"
-#include "libavutil/opt.h"
-
-#ifdef __cplusplus
-}
-#endif
 
 //#define AUDIO_TIMESTAMP_INCREMENT ((double)(1024.0 / 8000.0))
 //#define VIDEO_TIMESTAMP_INCREMENT ((double)(1.0 / 15.0)) // 29.745
@@ -224,19 +212,11 @@ AudioRTPSession::~AudioRTPSession()
 
 void AudioRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPacket &rtppack)
 {
-	LOGD("AudioRTPSession ProcessRTPPacket !");
-	if(srcdat.RR_HasInfo()) {
-		float rtt = ((srcdat.RR_GetReceiveTime().ntptimetran() - srcdat.RR_GetLastSRTimestamp() - srcdat.RR_GetDelaySinceLastSR())*1000)/65536;
-		LOGD("~~AudioRTPSession RTPSourceData,rtt = %f, lostRate=%lf, PacketsLost=%d, jitter=%d",rtt, srcdat.RR_GetFractionLost(), srcdat.RR_GetPacketsLost(), srcdat.RR_GetJitter());
-	}
-	else
-		LOGD("RTPSourceData NONE");
-
 	if (rtppack.HasMarker()) {// mark的pack是完整包的最后一个pack
 		double timestamp = *((double*)rtppack.GetPayloadData());
 		uint32_t sequenceNum = *((uint32_t*)(rtppack.GetPayloadData() + sizeof(double)));
 
-		LOGD("AudioRTPSession Timestamp:%lf, sequenceNum = %d, __LINE__: %d\n", timestamp,sequenceNum, __LINE__);
+		LOGD("AudioRTPSession ProcessRTPPacket Mark=true, Timestamp:%lf, sequenceNum = %d, __LINE__: %d\n", timestamp,sequenceNum, __LINE__);
 
 //		FILE* flog = fopen("/mnt/sdcard/audiorecv.log", "a");
 //		if (flog) {
@@ -271,8 +251,11 @@ void AudioRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 
 void AVBaseRTPSession::OnPollThreadStep()
 {
+
 	BeginDataAccess();
-	if (GotoFirstSourceWithData())
+	bool flag = GotoFirstSourceWithData();
+//	LOGD("AVBaseRTPSession::OnPollThreadStep START,cur type=%d flat=%d", m_type, flag);
+	if (flag)
     {
         do
         {
@@ -286,6 +269,7 @@ void AVBaseRTPSession::OnPollThreadStep()
                 ProcessRTPPacket(*srcdat,*pack);
                 DeletePacket(pack);
             }
+//            LOGD("AVBaseRTPSession::OnPollThreadStep pack ==NULL,cur type=%d", m_type);
         } while (GotoNextSourceWithData());
     }
 
@@ -294,7 +278,9 @@ void AVBaseRTPSession::OnPollThreadStep()
 
 void AVBaseRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat, const RTPPacket &rtppack)
 {
-	LOGD("AVBaseRTPSession::ProcessRTPPacket get Payload  Type()= %d,  length = %d",rtppack.GetPayloadType(), rtppack.GetPayloadLength());
+
+	LOGD("AVBaseRTPSession::ProcessRTPPacket(cur type=%d, packet Type= %d, SSRC=%d, length = %d",
+			m_type, rtppack.GetPayloadType(), rtppack.GetSSRC(), rtppack.GetPayloadLength());
     if (rtppack.GetPayloadType() == RTP_VIDEO_PAYLOAD_TYPE) {//96
     	if (m_videoSess) {
     		m_videoSess->ProcessRTPPacket(srcdat, rtppack);
@@ -312,7 +298,6 @@ void AVBaseRTPSession::OnRTCPCompoundPacket(RTCPCompoundPacket *pack,const RTPTi
 
     RTCPPacket *rtcppack;
     pack->GotoFirstPacket();
-    LOGD("Got OnRTCPCompoundPacket start");
     while ((rtcppack = pack->GetNextPacket()) != 0)
     {
         if (rtcppack->IsKnownFormat())
@@ -369,4 +354,17 @@ void AVBaseRTPSession::OnPollThreadError(int errcode)
 //		fclose(flog);
 //	}
 	LOGE("AVBaseRTPSession::OnPollThreadError type = %d, errcode = %d", m_type, errcode);
+}
+
+void AVBaseRTPSession::OnTimeout(RTPSourceData *srcdat)
+{
+	LOGE("AVBaseRTPSession::OnTimeout, local type =%d", m_type);
+	if(srcdat->IsRTPAddressSet()) {
+		RTPNATTVLAddress* addr2 = (RTPNATTVLAddress*)srcdat->GetRTPDataAddress();
+
+		LOGE("AVBaseRTPSession::OnTimeout, AddressTyp==%d ",addr2->GetAddressType());
+		if(addr2->GetAddressType() == 2)
+			LOGE("AVBaseRTPSession::OnTimeout, gpid==%s ",(char*)addr2->getGPID());
+	}
+	LOGE("AVBaseRTPSession::OnTimeout, current type=%d, srcdat->GetSSRC(): %d", m_type,srcdat->GetSSRC());
 }

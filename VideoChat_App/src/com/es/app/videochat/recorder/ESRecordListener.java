@@ -6,7 +6,7 @@ public class ESRecordListener {
 	public static final int AUDIO_RECORD = 2;
 	
 	public interface OnEncoderListener {
-		public void onEncodeFinished(byte[] data, int length);
+		public void onEncodeFinished(byte[] data, long timestamp);
 	}
 	
 	public interface OnRecordServiceListener {

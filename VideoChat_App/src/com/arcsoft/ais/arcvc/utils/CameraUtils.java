@@ -2,11 +2,9 @@ package com.arcsoft.ais.arcvc.utils;
 
 import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -16,74 +14,29 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
-import android.app.Activity;
 import android.hardware.Camera;
-import android.hardware.Camera.Parameters;
 import android.hardware.Camera.Size;
-import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.media.MediaRecorder;
 import android.os.Environment;
 import android.util.Log;
-import android.view.Surface;
 import android.view.SurfaceView;
 
 import com.arcsoft.ais.arcvc.bean.VideoConfig;
 import com.arcsoft.ais.arcvc.jni.AACNal;
 import com.arcsoft.ais.arcvc.jni.H264Nal;
-import com.es.app.videochat.recorder.AACDecoder;
 
 public class CameraUtils {
-
+	
+	public static int previewSize_width = 320;//640;//
+	public static int previewSize_Height = 240;//480;//
+	
 	private static final String TAG =  "CameraUtils";
 	private static final Map<String, VideoConfig> videoConfigs = new HashMap<String, VideoConfig>();
-	private static Camera frontCamera ;
-	private static List<Size> supportedPreviewSizes;
 	private static String bestResolution;
-	private static int cameraIndex = 0;
-	private static boolean usingCam = false;
 	private static long timeuse = 0;
 	
-//	public static int searchCameraIndex(){
-//		Camera.CameraInfo cameraInfo = new Camera.CameraInfo();
-//		int cameraCount = Camera.getNumberOfCameras(); // get cameras number
-//		for (int camIdx = 0; camIdx < cameraCount; camIdx++) {
-//			Camera.getCameraInfo(camIdx, cameraInfo); // get camerainfo
-//			if (cameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-//				setCameraIndex(cameraIndex);
-//				break;
-//			}
-//		}
-//		Log.i(Global.TAG, "CameraUtils ----cameraIndex---------!"+-cameraIndex);
-//		return cameraIndex;
-//	}
-	public static Camera getNewCameraInstance() {
-		Log.i(Global.TAG, "CameraUtils ----_getFrontCamera----------Start!");
-		Camera camera = null;
-//		searchCameraIndex();
-		Camera.CameraInfo cameraInfo = new Camera.CameraInfo();
-		int cameraCount = Camera.getNumberOfCameras(); // get cameras number
-		for (int camIdx = 0; camIdx < cameraCount; camIdx++) {
-			Camera.getCameraInfo(camIdx, cameraInfo); // get camerainfo
-			if (cameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-				camera = Camera.open(camIdx);
-				cameraIndex = camIdx ;
-				break;
-			}
-		}
-		Log.i(Global.TAG, "CameraUtils ----getCameraIndex()---------=="+getCameraIndex());
-//		camera = Camera.open(getCameraIndex());
-		Parameters parameters = camera.getParameters();
-		supportedPreviewSizes = parameters.getSupportedPreviewSizes();
-		if (!SdCardUtils.vcConfigExists())
-			initVcConfig(supportedPreviewSizes);
-		bestResolution = getBestResolution();
-		loadVideoConfigs();
-		frontCamera = camera;
-		Log.i(Global.TAG, "CameraUtils ----_getFrontCamera----------end!");
-		return camera;
-	}
 	
 	private static void loadVideoConfigs() {
 		Log.i(Global.TAG, "CameraUtils ----loadVideoConfigs----------start!");
@@ -107,15 +60,8 @@ public class CameraUtils {
 		//Log.i(Global.TAG, "CameraUtils ----loadVideoConfigs----------end!");
 	}
 
-	public static Camera getFrontCamera() {
-		return frontCamera;
-	}
 
-	public static List<Size> getSupportedPreviewSizes() {
-		return supportedPreviewSizes;
-	}
-
-	public static void initVcConfig(List<Size> list) {
+	private static void initVcConfig(List<Size> list) {
 		Document document = SdCardUtils.getVcConfig();
 		Element root = document.createElement("Android");
 		Element cameras = document.createElement("Cameras");
@@ -129,85 +75,7 @@ public class CameraUtils {
 		SdCardUtils.writeVcConfig(document);
 	}
 
-	public static String getBestResolution() {
-		int width = 0;
-		int height = 0;
-		for (int i = 0; i < supportedPreviewSizes.size(); i++) {
-			Size size = supportedPreviewSizes.get(i);
-			if (size.width == 320) {//320
-				width = size.width;
-				height = size.height;
-				break;
-			}
-			
-		}
-//		Size size = supportedPreviewSizes.get(supportedPreviewSizes.size() - 1);
-//		width = size.width;
-//		height = size.height;
-		return width + "x" + height;
-	}
 
-	public static void getSPSPPS(SurfaceView sv) throws IOException {
-		long timeStart = System.currentTimeMillis();
-		MediaRecorder mMediaRecorder = new MediaRecorder();
-		frontCamera.unlock();
-		mMediaRecorder.setCamera(frontCamera);
-		mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
-		mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
-		mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-		mMediaRecorder.setVideoFrameRate(15);
-		String[] tmp = bestResolution.split("x");
-		mMediaRecorder.setVideoSize(Integer.parseInt(tmp[0]), Integer.parseInt(tmp[1]));
-//		SurfaceHolder surfaceHolder = sv.getHolder() ;
-//		surfaceHolder.addCallback(callback);
-		mMediaRecorder.setPreviewDisplay(sv.getHolder().getSurface());
-		mMediaRecorder.setMaxDuration(1000);
-		mMediaRecorder.setMaxFileSize(0);
-		// mMediaRecorder.setOutputFile(sender.getFileDescriptor());
-		mMediaRecorder.setOutputFile(SdCardUtils.APP_DATA_PATH + "/sample.vc");
-		try {
-			mMediaRecorder.prepare();
-			mMediaRecorder.start();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-		try {
-			Thread.sleep(1500);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		mMediaRecorder.stop();
-		mMediaRecorder.reset();
-		mMediaRecorder.release();
-		
-		Map<String, byte[]> map = getSPSAndPPS(SdCardUtils.APP_DATA_PATH + "/sample.vc");
-		File file = new File(SdCardUtils.APP_DATA_PATH + "/sample.vc");
-		file.delete();
-		Document doc = SdCardUtils.getVcConfig();
-		Element root = (Element) doc.getDocumentElement().getFirstChild();
-		NodeList list = root.getElementsByTagName("Resolution");
-		for (int i = 0; i < list.getLength(); i++) {
-			Element e = (Element) list.item(i);
-			VideoConfig vc = new VideoConfig();
-			if (e.getAttribute("size").equals(bestResolution)) {
-				String size = e.getAttribute("size");
-				tmp = size.split("x");
-				vc.setPps(map.get("pps"));
-				vc.setSps(map.get("sps"));
-				vc.setWidth(Integer.parseInt(tmp[0]));
-				vc.setHeight(Integer.parseInt(tmp[1]));
-				videoConfigs.put(size, vc);
-				e.setAttribute("sps", bytesToHexString(map.get("sps")));
-				e.setAttribute("pps", bytesToHexString(map.get("pps")));
-				break;
-			}
-		}
-		SdCardUtils.writeVcConfig(doc);
-		Log.v(TAG, "getSPSPPS cost time:"+(System.currentTimeMillis() - timeStart));
-	}
 
 	private static Map<String, byte[]> getSPSAndPPS(String fileName) throws IOException {
 		Map<String, byte[]> map = new HashMap<String, byte[]>();
@@ -312,7 +180,7 @@ public class CameraUtils {
 		return (byte) "0123456789ABCDEF".indexOf(c);
 	}
 	
-	public static VideoConfig getVideoConfig() {
+	private static VideoConfig getVideoConfig() {
 		return videoConfigs.get(bestResolution);
 	}
 
@@ -375,7 +243,7 @@ public class CameraUtils {
 					//Log.i(Global.TAG, "recording====" + "loop starting....");
 					//Log.i(Global.TAG, "recording====" + "loop usingCam...." + usingCam);
 					//Log.i(Global.TAG, "recording====" + "loop receiver...." + SocketUtils.getReceiverSocket());
-					if (!usingCam || SocketUtils.getVideoReceiverSocket() == null)
+					if (SocketUtils.getVideoReceiverSocket() == null)
 						break;
 					try {
 						//Log.i(Global.TAG, "recording====" + "loop dis.available()...." + dis.available());
@@ -433,32 +301,7 @@ public class CameraUtils {
 		}).start();
 	}
 
-    public static int getCameraDisplayOrientationDegrees(Activity activity,
-             android.hardware.Camera camera) {
-        android.hardware.Camera.CameraInfo info =
-                new android.hardware.Camera.CameraInfo();
-        android.hardware.Camera.getCameraInfo(getCameraIndex(), info);
-        int rotation = activity.getWindowManager().getDefaultDisplay()
-                .getRotation();
-        int degrees = 0;
-        switch (rotation) {
-            case Surface.ROTATION_0: degrees = 0; break;
-            case Surface.ROTATION_90: degrees = 90; break;
-            case Surface.ROTATION_180: degrees = 180; break;
-            case Surface.ROTATION_270: degrees = 270; break;
-        }
     
-        int result;
-        if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-            result = (info.orientation + degrees) % 360;
-            result = (360 - result) % 360;  // compensate the mirror
-        } else {  // back-facing
-            result = (info.orientation - degrees + 360) % 360;
-        }
-        return result ;
-    }
-    
-    static AACDecoder audioDecoder ;
 	public static void startAudioRecording() {
 		//Log.i(Global.TAG, "startVideoRecording====" + "starting....");
 		(new Thread() {
@@ -527,7 +370,7 @@ public class CameraUtils {
 //						audioDecoder.onFrame(naluData, 0, naluData.length, 0);
 						nalu.setPayload(naluData);
 						nalu.setPayloadLength(naluData.length);
-						P2PClientManager.getP2PClientInstance().sendAACPacket("", nalu);
+//						P2PClientManager.getP2PClientInstance().sendAACPacket("", nalu);
 						
 //						Log.d(Global.TAG, "sendAACPacket, naluData.length==" + nalu.getPayloadLength());
 					} catch (Exception e) {
@@ -642,23 +485,6 @@ public class CameraUtils {
 		mMediaRecorder.setOutputFile(SocketUtils.getAudioSenderSocket().getFileDescriptor());
 //		mMediaRecorder.setOutputFile(Environment.getExternalStorageDirectory().getPath().concat(File.separator).concat("test2.m4p"));
 		return mMediaRecorder;
-	}
-
-	
-	public static boolean isUsingCam() {
-		return usingCam;
-	}
-
-	public static void setUsingCam(boolean usingCamParam) {
-		usingCam = usingCamParam;
-	}
-
-	public static int getCameraIndex() {
-		return cameraIndex;
-	}
-
-	public static void setCameraIndex(int cameraIndex) {
-		CameraUtils.cameraIndex = cameraIndex;
 	}
 
 }

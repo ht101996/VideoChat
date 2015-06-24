@@ -11,13 +11,15 @@ import java.util.concurrent.LinkedBlockingQueue;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.os.Environment;
+import android.sax.StartElementListener;
 import android.util.Log;
 import android.view.Surface;
 
 public class H264Decoder extends VideoDecoderBase implements Runnable{
 	private static final String Tag = H264Decoder.class.getSimpleName();
 	private MediaCodec mediaCodec = null;  
-	
+	private MediaFormat mediaFormat = null;
+	private Surface surface = null;
 	private int width, height, frameRate;
 //	int mCount = 0;
 	private boolean stopped = true;
@@ -30,13 +32,16 @@ public class H264Decoder extends VideoDecoderBase implements Runnable{
 	
 	public void setupDecoder(Surface surface) {
 		 mediaCodec = MediaCodec.createDecoderByType("video/avc");
-	     MediaFormat mediaFormat = MediaFormat.createVideoFormat("video/avc", width, height);
-	     mediaCodec.configure(mediaFormat, surface, null, 0);
-	     mediaCodec.start();
-	     stopped = false;
+		 mediaFormat = MediaFormat.createVideoFormat("video/avc", width, height);
+		 this.surface = surface;
 //	     new Thread(this).start();
 	}
 	
+	public void startDecoder() {
+		 mediaCodec.configure(mediaFormat, surface, null, 0);
+	     mediaCodec.start();
+	     stopped = false;
+	}
 	public void stopDecoder() {
 		if(mediaCodec != null)
 			mediaCodec.stop();
@@ -46,6 +51,13 @@ public class H264Decoder extends VideoDecoderBase implements Runnable{
 	public void releaseDecoder() {
 		if(mediaCodec != null)
 			mediaCodec.release();
+	}
+	
+	public void resetDecoder() {
+		if(mediaCodec == null)
+			return;
+		stopDecoder();
+		startDecoder();
 	}
 	
 	@Override
@@ -63,14 +75,12 @@ public class H264Decoder extends VideoDecoderBase implements Runnable{
 //			}
 //			
 //			if(decodeByte == null){
-//				System.out.println("<--cxd, run get decodeByte from queue is null");
 //				continue;
 //			}
 //				
 //			ByteBuffer[] inputBuffers = mediaCodec.getInputBuffers();
 //			int inputBufferIndex = mediaCodec.dequeueInputBuffer(-1);
 //			if (inputBufferIndex >= 0) {
-//				System.out.println("<--cxd, run inputBufferIndex:"+inputBufferIndex);
 //				ByteBuffer inputBuffer = inputBuffers[inputBufferIndex];
 //				inputBuffer.clear();
 //				inputBuffer.put(decodeByte, 0, decodeByte.length);
@@ -82,12 +92,10 @@ public class H264Decoder extends VideoDecoderBase implements Runnable{
 //			MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
 //			int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
 //			while (outputBufferIndex >= 0) {
-//				System.out.println("<--cxd, run video presentationTimeUs:"+bufferInfo.presentationTimeUs+", nano time interval:"+(System.nanoTime() - curTime));
 //				curTime = System.nanoTime();
 //				mediaCodec.releaseOutputBuffer(outputBufferIndex, true);
 //				outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
 //			}
-//			System.out.println("<<--cxd, run while end");
 //		}
 	}
 	
@@ -115,7 +123,6 @@ public class H264Decoder extends VideoDecoderBase implements Runnable{
 //		int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
 //		while (outputBufferIndex >= 0) {
 ////			TimeMonitor.videoDecodePresentationTimeUs = bufferInfo.presentationTimeUs;
-//			System.out.println("<--cxd, decode video presentationTimeUs:"+(float)bufferInfo.presentationTimeUs / 1000000);
 //			mediaCodec.releaseOutputBuffer(outputBufferIndex, true);
 //			outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
 //		}
@@ -126,7 +133,7 @@ public class H264Decoder extends VideoDecoderBase implements Runnable{
 		
 		ByteBuffer[] inputBuffers = mediaCodec.getInputBuffers();
 		int inputBufferIndex = mediaCodec.dequeueInputBuffer(-1);
-		Log.d(Tag,"decode input buffer index= " + inputBufferIndex+", input data length:"+data.length+", timestamp:"+timestamp);
+		Log.d(Tag,"H264Decoder, input buffer index= " + inputBufferIndex+", input data length:"+data.length+", timestamp:"+timestamp);
 		if (inputBufferIndex >= 0) {
 			ByteBuffer inputBuffer = inputBuffers[inputBufferIndex];
 			inputBuffer.clear();
@@ -138,7 +145,7 @@ public class H264Decoder extends VideoDecoderBase implements Runnable{
 		MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
 		int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
 		while (outputBufferIndex >= 0) {
-			System.out.println("<--cxd, decode video in java presentationTimeUs:"+(float)bufferInfo.presentationTimeUs/1000000);
+//			System.out.println("<--cxd, decode video in java presentationTimeUs:"+(float)bufferInfo.presentationTimeUs/1000000);
 			mediaCodec.releaseOutputBuffer(outputBufferIndex, true);
 			outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
 		}

@@ -263,16 +263,8 @@ public class TextActivity extends Activity implements View.OnClickListener {
 		Log.i(Global.TAG, "onSendClickEvent>>>..remotePeerId." + remotePeerId);
 		if (msg != null && msg.length() > 0) {
 			Log.i(Global.TAG, "p2p sendMsg>>>...msg======" + msg);
-			String message = Global.catMsg(Global.MSG_TYPE_TEXT_CHATTING_SEND_MSG, Global.MSG_TYPE_TEXT_CHATTING_SEND_MSG_DEFAULT, msg);
-			Log.i(Global.TAG, "p2p sendMsg>>>..from peerId=======" + currentPeerId);
-			Log.i(Global.TAG, "p2p sendMsg>>>message======" + message);
 
-			// for (String peerId : peerIdsOfFriends) {
-			// Log.i(Global.TAG, "p2p sendMsg>>>..to peerId=======" + peerId);
-			// P2PClientManager.getP2PClientInstance().sendMsg(peerId, message);
-			// }
-
-			P2PClientManager.getP2PClientInstance().sendMsg(remotePeerId, message);
+			P2PClientManager.getP2PClientInstance().sendTextMsg(remotePeerId, msg);
 			// Editable text = editText_receive_msg.getText();
 
 			SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd-HH:mm:ss", Locale.US);

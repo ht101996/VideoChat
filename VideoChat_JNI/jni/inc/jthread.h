@@ -68,10 +68,12 @@ private:
 #endif // WIN32
 	void *retval;
 	bool running;
+	bool mutexinit;
+	POS_FILLER2;
 	
 	JMutex runningmutex;
 	JMutex continuemutex,continuemutex2;
-	bool mutexinit;
+
 };
 
 #endif // JTHREAD_H

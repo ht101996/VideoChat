@@ -15,7 +15,6 @@ import android.view.View;
 import android.widget.ImageView;
 
 import com.arcsoft.ais.arcvc.R;
-import com.arcsoft.ais.arcvc.service.CameraConfigureThread;
 import com.arcsoft.ais.arcvc.utils.CameraUtils;
 import com.arcsoft.ais.arcvc.utils.Global;
 
@@ -35,7 +34,7 @@ public class MainActivity extends Activity {
 		iv = (ImageView) findViewById(R.id.imageView1);
 		sv.setVisibility(View.GONE);
 //		new CameraConfigureThread(sv).start();
-		CameraUtils.getFrontCamera();
+//		CameraUtils.getFrontCamera();
 	}
 
 	private Handler handler = new Handler() {

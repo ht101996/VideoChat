@@ -1,33 +1,27 @@
 package com.es.app.videochat.recorder;
 
-import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-import com.arcsoft.ais.arcvc.bean.VideoConfig;
 import com.arcsoft.ais.arcvc.jni.H264Nal;
-import com.arcsoft.ais.arcvc.utils.CameraUtils;
-import com.arcsoft.ais.arcvc.utils.Global;
 import com.arcsoft.ais.arcvc.utils.P2PClientManager;
-import com.arcsoft.ais.arcvc.utils.SocketUtils;
 
 import android.graphics.ImageFormat;
 import android.media.MediaCodec;
 import android.media.MediaCodec.BufferInfo;
 import android.media.MediaCodecInfo;
-import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.os.Environment;
 import android.util.Log;
 
 public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnable {
 
-	public final String TAG = "ES.ESNativeH264Encoder";
-	
+	public final String TAG = "ESNativeH264Encoder";
+	private final byte[] spsHeader = new byte[] {0x00, 0x00, 0x00, 0x01, 0x67};
+	private final byte[] ppsHeader = new byte[] {0x00, 0x00, 0x00, 0x01, 0x68};
 	private MediaCodec mediaCodec = null;  
 	private MediaFormat mediaFormat = null;
     byte[] m_info = null;
@@ -37,9 +31,9 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
     private BufferInfo bufferInfo = new BufferInfo();
     
     private byte[] inputFrame = null;
-    private byte[] outputH264Frame = null;
+//    private byte[] outputH264Frame = null;
     
-    private volatile Object mutex = null;
+    private volatile Object mutex = new Object();;
     
     private Thread encodeThread = null;
     private boolean bThreadStop = false;
@@ -186,7 +180,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 	
         int frameSize = width * height * 3 / 2;
         inputFrame = new byte[frameSize];
-        outputH264Frame = new byte[frameSize];
+//        outputH264Frame = new byte[frameSize];
 		
 		mediaCodec = MediaCodec.createEncoderByType(mimeType);  
 		
@@ -229,6 +223,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 	@Override
 	public void start(boolean async)
 	{
+		
 		try {
             mediaCodec.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);  
             mediaCodec.start();
@@ -240,6 +235,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 		{
 			if(null == encodeThread)
 			{
+				bThreadStop = false;
 				encodeThread = new Thread(this);
 				encodeThread.start();
 			}
@@ -267,14 +263,9 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 	public void run() {
 		
 		while (!bThreadStop) {
-			
-			int pos = 0; 
-					
 			int index = -1;
 			boolean isDataReady = false;
 			
-			if(null == mutex)
-				continue;
 			synchronized(mutex)
 			{
 				try {
@@ -285,7 +276,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 					{
 						index = mediaCodec.dequeueOutputBuffer(bufferInfo, 100000);
 						if (index>=0 ){
-							System.out.println("<--cxd, encode video presentationTimeUs:"+(float)bufferInfo.presentationTimeUs / 1000000);
+//							System.out.println("<--cxd, encode video presentationTimeUs:"+(float)bufferInfo.presentationTimeUs / 1000000);
 							TimeMonitor.videoEncodePresentationTimeUs = bufferInfo.presentationTimeUs;
 							isDataReady = true;
 							break;
@@ -309,15 +300,19 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 //						MediaMuxerWrapper.setVideoData(outputBuffer, bufferInfo);
 						byte[] outData = new byte[bufferInfo.size];
 						outputBuffer.get(outData);
-						boolean dataReady = sendToMediaCodec(outData);
-						if(dataReady) {
-							sendImagePacket(outData, bufferInfo.presentationTimeUs);//TODO outData->outputH264Frame
-						}
-						else {
-							getSPSAndPPS();
-							sendSPSAndPPSPacket();
-						}
-							
+						
+//						boolean dataReady = sendToMediaCodec(outData);
+//						if(dataReady) {
+//							sendImagePacket(outData, bufferInfo.presentationTimeUs);//TODO outData->outputH264Frame
+//						}
+//						else {
+//							getSPSAndPPS();
+//							sendSPSAndPPSPacket();
+//						}
+						
+						catchSPSAndPPSInfo(outData);
+						sendImagePacket(outData, bufferInfo.presentationTimeUs);//TODO outData->outputH264Frame
+
 						
 					    mediaCodec.releaseOutputBuffer(index, false);
 					}
@@ -334,8 +329,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 	private void getSPSAndPPS() {
 		if(m_info == null || m_info.length < 5)
 			return;
-		byte[] spsHeader = new byte[] {0x00, 0x00, 0x00, 0x01, 0x67};
-		byte[] ppsHeader = new byte[] {0x00, 0x00, 0x00, 0x01, 0x68};
+		
 		byte[] buff = new byte[5];
 		int pos = 0;
 		int sspPos = 0, ppsPos = 0;
@@ -390,9 +384,22 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 		nalu.setPayload(naluData);
 		nalu.setPayloadLength(naluData.length);
 		P2PClientManager.getP2PClientInstance().send264Packet2(type, nalu, timestamp);
+	    
+		if(encoderListener != null)
+	    	encoderListener.onEncodeFinished(naluData, timestamp);
 	}
 	
-
+	private void catchSPSAndPPSInfo(byte[] outData) {
+		if(m_info != null) 
+			return;
+    	byte[] buff = new byte[5];
+        System.arraycopy(outData, 0 ,buff, 0, 5);
+        if(Arrays.equals(buff, ppsHeader) || Arrays.equals(buff, spsHeader))
+        {
+            m_info = new byte[outData.length];
+            System.arraycopy(outData, 0, m_info, 0, outData.length);
+        }
+	}
 	private boolean sendToMediaCodec(byte[] outData) {
 		int pos = 0; 
 		boolean isDataReady = true;
@@ -400,13 +407,16 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 
 	    if(m_info != null)
 	    {
-	        System.arraycopy(outData, 0, outputH264Frame, pos, outData.length);
+//	        System.arraycopy(outData, 0, outputH264Frame, pos, outData.length);
 	        pos += outData.length;
 	    }
 	    else //保存pps sps 只有开始时 第一个帧里有， 保存起来后面用
 	    {
-	        ByteBuffer spsPpsBuffer = ByteBuffer.wrap(outData);
-	        if (spsPpsBuffer.getInt() == 0x00000001)
+//	        ByteBuffer spsPpsBuffer = ByteBuffer.wrap(outData);
+	    	byte[] buff = new byte[5];
+	        System.arraycopy(outData, 0 ,buff, 0, 5);
+//	        if (spsPpsBuffer.getInt() == 0x00000001)
+	        if(Arrays.equals(buff, ppsHeader) || Arrays.equals(buff, spsHeader))
 	        {
 	            m_info = new byte[outData.length];
 	            System.arraycopy(outData, 0, m_info, 0, outData.length);
@@ -420,19 +430,19 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 		    if(outData[4] == 0x65) //key frame   编码器生成关键帧时只有 00 00 00 01 65 没有pps sps， 要加上  
 			{  
 		    	byte[] keyFrameData = new byte[pos];
-				System.arraycopy(outputH264Frame, 0, keyFrameData, 0, pos);  
-				System.arraycopy(m_info, 0,  outputH264Frame, 0, m_info.length);  
-				System.arraycopy(keyFrameData, 0,  outputH264Frame, m_info.length, pos);  
+//				System.arraycopy(outputH264Frame, 0, keyFrameData, 0, pos);  
+//				System.arraycopy(m_info, 0,  outputH264Frame, 0, m_info.length);  
+//				System.arraycopy(keyFrameData, 0,  outputH264Frame, m_info.length, pos);  
 				pos += m_info.length;  
-				System.out.println("----->cxd, add pps sps to key frame");
 			}	
 		   
 //		    output(outputH264Frame);
-		    if(encoderListener != null)
-		    	encoderListener.onEncodeFinished(outputH264Frame, pos);
+//		    if(encoderListener != null)
+//		    	encoderListener.onEncodeFinished(outputH264Frame, pos);
 	    }
 	    return isDataReady;
 	}
+	
 	public void dataTransefer(byte[] data)
 	{
 		switch (colorFormat) {
@@ -484,8 +494,6 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 			byte[] rotateData = rotateYUV420Degree90(inputFrame,videoQuality.resX,videoQuality.resY);
 			System.arraycopy(rotateData, 0, inputFrame, 0, length);
 			
-			if(null == mutex)
-				mutex = new Object();
 			
 			final ByteBuffer[] inputBuffers = mediaCodec.getInputBuffers(); 
 			int inputBufferIndex;

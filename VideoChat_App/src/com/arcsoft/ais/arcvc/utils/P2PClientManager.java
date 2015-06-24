@@ -8,9 +8,10 @@ public class P2PClientManager {
 	public static P2PClient getP2PClientInstance() {
 		if (p2pClient == null) {
 			p2pClient = new P2PClient();
-			p2pClient.init(SdCardUtils.APP_DATA_PATH);
 		}
-		//Log.i(Global.TAG, " getP2PClientInstance============" + p2pClient);
+
+		if(!p2pClient.isInited())
+			p2pClient.init(SdCardUtils.APP_DATA_PATH);
 		return p2pClient;
 	}
 	

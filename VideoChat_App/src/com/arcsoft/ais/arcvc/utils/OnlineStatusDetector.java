@@ -93,7 +93,7 @@ public class OnlineStatusDetector implements Runnable {
             		String message = Global.catMsg(Global.MSG_TYPE_ONLINE_STATUS_DETECT, 
             					Global.MSG_TYPE_ONLINE_STATUS_DETECT_HEARTBEAT,
             					String.valueOf(friendOnlineStatus.getUserId()) + "," + currentPeerId + "," +peerIdOnlineStatus2.getPeerId());
-                		P2PClientManager.getP2PClientInstance().sendMsg(peerIdOnlineStatus2.getPeerId(), message);
+//                		P2PClientManager.getP2PClientInstance().sendMsg(peerIdOnlineStatus2.getPeerId(), message);
                 		//Log.i(Global.TAG, "OnlineStatusDetector detect==message=="+message);
                 		//Log.i(Global.TAG, "P2PClientManager.getP2PClientInstance().sendMsg====sended");
 					}else{

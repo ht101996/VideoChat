@@ -122,11 +122,11 @@ public class ESAudioRecordService implements OnEncoderListener {
 	}
 
 	@Override
-	public void onEncodeFinished(byte[] data, int length) {
+	public void onEncodeFinished(byte[] data, long timestamp) {
 		// TODO Auto-generated method stub
 		
 		if(recordServiceListener != null)
-			recordServiceListener.onEncodeFinished(ESRecordListener.AUDIO_RECORD, data, length);
+			recordServiceListener.onEncodeFinished(ESRecordListener.AUDIO_RECORD, data, data.length);
 	}
 	
 	public void stop()

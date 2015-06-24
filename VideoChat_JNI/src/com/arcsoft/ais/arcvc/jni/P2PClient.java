@@ -8,16 +8,12 @@ import com.arcsoft.ais.arcvc.utils.Global;
 
 
 import android.os.Environment;
+import android.util.Log;
 
 public class P2PClient {
-	public static final String TAG = "P2PClient";
-	
 	static {
-//		System.loadLibrary("ffmpeg");
 		System.loadLibrary("P2PClient");
 	}
-	private DateReceivedListener dataListener;
-	private OnlineStateDetectionListener onlineStateDetectionListener;
 	
 	public interface DateReceivedListener{
 		public void onH264DataReceived(byte[] data, int offset, int length, double timestamp);
@@ -29,25 +25,52 @@ public class P2PClient {
 		public void onheartbeatDetected(String arg1, String arg2);
 	}
 	
+	public static final String TAG = "P2PClient";
+	
+	private DateReceivedListener dataListener;
+	private OnlineStateDetectionListener onlineStateDetectionListener;
+	private boolean inited = false;
+	
 	public void requestVideoChat(String destGPID) {
+		Log.d(TAG, "requestVideoChat to GPID:"+destGPID);
 		String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST, Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_APPLY, "Apply");
 		sendMsg(destGPID, message);
 	}
 	
 	public void rejectVideoChat(String destGPID) {
+		Log.d(TAG, "rejectVideoChat to GPID:"+destGPID);
 		String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST,
 				Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_REJECT, "Reject");
+		
 		sendMsg(destGPID, message);
 	}
 	
 	public void acceptVideoChat(String destGPID) {
+		Log.d(TAG, "acceptVideoChat to GPID:"+destGPID);
 		String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST, Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_ACCEPT, "Accept");
 		sendMsg(destGPID, message);
 	}
 	
 	public void stopVideoChat(String destGPID) {
+		Log.d(TAG, "stopVideoChat to GPID:"+destGPID);
 		String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST,Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_END,"End");
 		sendMsg(destGPID, message);
+	}
+	
+	public void sendTextMsg(String destGPID, String textMsg) {
+		String message = Global.catMsg(Global.MSG_TYPE_TEXT_CHATTING_SEND_MSG, Global.MSG_TYPE_TEXT_CHATTING_SEND_MSG_DEFAULT, textMsg);
+		sendMsg(destGPID, message);
+	}
+	public void init(String initDirPath) {
+		nativeInit(initDirPath);
+		inited = true;
+	}
+	public void uninit() {
+		nativeUninit();
+		inited = false;
+	}
+	public boolean isInited() {
+		return inited;
 	}
 	
 	/**
@@ -56,9 +79,9 @@ public class P2PClient {
 	 * @param iniDirPath
 	 * @return gpid
 	 */
-	public native void init(String iniDirPath);
+	private native void nativeInit(String iniDirPath);
 	
-	public native void uninit();
+	private native void nativeUninit();
 
 	/**
 	 * send message from jni
@@ -66,7 +89,7 @@ public class P2PClient {
 	 * @param gpid
 	 * @param msg
 	 */
-	public native void sendMsg(String gpid, String msg);
+	private native void sendMsg(String gpid, String msg);
 
 	/**
 	 * pausePlaying
@@ -85,7 +108,6 @@ public class P2PClient {
 	
 	public native void send264Packet(String packetType, H264Nal nalu, long timestamp);
 	
-	public native void sendAACPacket(String packetType,AACNal nalu);
 	public native void sendAACESData(byte[] data, int length, long timestamp);
 
 	
@@ -110,12 +132,10 @@ public class P2PClient {
 	private void output(byte[] input) {
 		FileOutputStream fos;
 		try{
-			///if(input[4] == 0x65 || input[4] == 0x67 || input[4] == 0x68) {
 			fos = new FileOutputStream( new File(outputFile.concat(outputindex + ".txt")), true);
 			fos.write(input);
 			fos.flush();
 			fos.close();
-		//	}
 			outputindex ++;
 		}catch(Exception e) {
 			e.printStackTrace();
@@ -129,12 +149,8 @@ public class P2PClient {
 	 * @param timestampUs
 	 */
 	public  void send264Packet2(String packetType, H264Nal nalu, long timestampUs){
-		
-//		output(packetType, nalu.getType(), nalu.getPayload());
 		send264Packet(packetType, nalu, timestampUs);
 	}
-	
-	
 	
 	public void setDateReceivedListener(DateReceivedListener listener) {
 		this.dataListener = listener;
@@ -143,20 +159,28 @@ public class P2PClient {
 		this.onlineStateDetectionListener = listener;
 	}
 	
-	//invoked by jni when received H264 data
+	/**
+	 * invoked by jni when received H264 data
+	 * @param data
+	 * @param offset
+	 * @param length
+	 * @param timestamp
+	 */
 	public void receiveH264Data(byte[] data, int offset, int length, double timestamp) {
-//		output(data);
 		if(dataListener != null)
 			dataListener.onH264DataReceived(data, offset, length, timestamp);
 	}
 
 	public void receiveAACData(byte[] data, int offset, int length, double timestamp) {
-//		output(data);
 		if(dataListener != null)
 			dataListener.onAACDataReceived(data, offset, length, timestamp);
 	}
 	
-	// invoked by jni, when received a string message
+	/**
+	 * invoked by jni, when received a string message
+	 * @param remoteGPID
+	 * @param msg
+	 */
 	public void receiveStringMsg(String remoteGPID, String msg) {
 		Map<String, String> msgMap = Global.parseMsg(msg);
 		String msgType = msgMap.get("msg_type");

@@ -8,27 +8,59 @@ import com.arcsoft.ais.arcvc.jni.P2PClient.DateReceivedListener;
 
 
 public class MediaDataCenter{
+	private final static String tag = MediaDataCenter.class.getSimpleName();
+	public interface DataDecodeListener {
+		public void onAudioDataDecoding(byte[] data, long timestampUs);
+		public void onVideoDataDecoding(byte[] data, long timestampUs);
+	}
+	
 	private static final String Tag = MediaDataCenter.class.getSimpleName();
 	private static MediaDataCenter mInstance;// = new MediaDataCenter();
 	
 	private ConcurrentLinkedQueue<VideoFrameItem> VideoFrameItemQueue = null;//new ConcurrentLinkedQueue<VideoFrameItem>();
 	private ConcurrentLinkedQueue<AudioStreamData> AudioStreamDataQueue = null;// new ConcurrentLinkedQueue<AudioStreamData>();
-	private AudioDecoderBase mAudioDecoder;
-	private VideoDecoderBase mVideoDecoder;
+	private DataDecodeListener decodeListener;
+	private boolean videoThreadStop = true;
+	private boolean audioThreadStop = true;
+	private boolean synVideoWithAudio = true;
 	private long audioPTS;
-	public static MediaDataCenter getInstance(AudioDecoderBase audioDecoder, VideoDecoderBase videoDecoder) {
+	public static MediaDataCenter getInstance(DataDecodeListener decodeListener) {
 		if(mInstance == null)
-			mInstance = new MediaDataCenter(audioDecoder, videoDecoder);
+			mInstance = new MediaDataCenter(decodeListener);
 		return mInstance;
 	}
 	
-	private MediaDataCenter(AudioDecoderBase audioDecoder, VideoDecoderBase videoDecoder) {
-		this.mAudioDecoder = audioDecoder;
-		this.mVideoDecoder = videoDecoder;
+	public static MediaDataCenter getInstance(DataDecodeListener decodeListener, boolean synVideoWithAudio) {
+		if(mInstance == null)
+			mInstance = new MediaDataCenter(decodeListener, synVideoWithAudio);
+		return mInstance;
+	}
+	
+	private MediaDataCenter(DataDecodeListener decodeListener) {
+		this.decodeListener = decodeListener;
 		VideoFrameItemQueue = new ConcurrentLinkedQueue<VideoFrameItem>();
 		AudioStreamDataQueue = new ConcurrentLinkedQueue<AudioStreamData>();
+		
+	}
+	
+	private MediaDataCenter(DataDecodeListener decodeListener, boolean synVideoWithAudio) {
+		this.decodeListener = decodeListener;
+		this.synVideoWithAudio = synVideoWithAudio;
+		VideoFrameItemQueue = new ConcurrentLinkedQueue<VideoFrameItem>();
+		AudioStreamDataQueue = new ConcurrentLinkedQueue<AudioStreamData>();
+		
+	}
+	
+	public void start() {
+		videoThreadStop = false;
+		audioThreadStop = false;
 		new AudioDecodeThread().start();
 		new VideoDecodeThread().start();
+	}
+	
+	public void stop() {
+		videoThreadStop = true;
+		audioThreadStop = true;
 	}
 	
 	public void addVideoFrame(VideoFrameItem item) {
@@ -41,16 +73,13 @@ public class MediaDataCenter{
 	private class AudioDecodeThread extends Thread {
 		@Override
 		public void run() {
-			while(true) {
+			while(!audioThreadStop) {
 				if(! AudioStreamDataQueue.isEmpty()) {
-					try{
 					AudioStreamData audioData = AudioStreamDataQueue.poll();
 					audioPTS = (long)audioData.getTimestamp() * 1000000;
-					mAudioDecoder.decode(audioData.getData(), audioPTS);
-					}catch(Exception e) {
-						e.printStackTrace();
-						Log.e(Tag, "!!!!!!!!!!!!!! AudioDecodeThread error");
-					}
+//					mAudioDecoder.decode(audioData.getData(), audioPTS);
+					if(decodeListener != null)
+						decodeListener.onAudioDataDecoding(audioData.getData(), audioPTS);
 				}
 			}
 		}
@@ -59,37 +88,42 @@ public class MediaDataCenter{
 	private class VideoDecodeThread extends Thread {
 		@Override
 		public void run() {
-			while(true) {
+			while(!videoThreadStop) {
 				boolean  videoEmpty = VideoFrameItemQueue.isEmpty();
 				if(! videoEmpty) {
-					try{
-					VideoFrameItem videoFrame = VideoFrameItemQueue.peek();
-					long videoPTS = (long)videoFrame.getTimestamp() * 1000000; 
-					long VAInterval = videoPTS - audioPTS;
-					if(VAInterval > 500000){
-						try{
-							Thread.sleep(50);
-						}catch(InterruptedException e){
-							e.printStackTrace();
+					if(synVideoWithAudio) {
+						VideoFrameItem videoFrame = VideoFrameItemQueue.peek();
+						long videoPTS = (long)videoFrame.getTimestamp() * 1000000; 
+						long VAInterval = videoPTS - audioPTS;
+						if(VAInterval > 500000){
+							try{
+								Thread.sleep(50);
+							}catch(InterruptedException e){
+								e.printStackTrace();
+							}
+							
+							Log.d(Tag, "VAInterval > 500000, Video="+videoPTS+"   audio="+audioPTS);
 						}
-						
-						Log.d(Tag, "VAInterval > 500000, Video="+videoPTS+"   audio="+audioPTS);
-					}
-					else if(VAInterval < -500000) {
-						VideoFrameItemQueue.poll();
-						Log.d(Tag, "~~VAInterval < -500000, Video="+videoPTS+"   audio="+audioPTS);
+						else if(VAInterval < -500000) {
+							VideoFrameItemQueue.poll();
+							Log.d(Tag, "~~VAInterval < -500000, Video="+videoPTS+"   audio="+audioPTS);
+						}
+						else {
+							Log.d(Tag, "500000 > VAInterval > -500000");
+							videoFrame = VideoFrameItemQueue.poll();
+							videoPTS = (long)videoFrame.getTimestamp() * 1000000; 
+							if(decodeListener != null)
+								decodeListener.onVideoDataDecoding(videoFrame.getData(), videoPTS);
+						}
 					}
 					else {
-						Log.d(Tag, "500000 > VAInterval > -500000");
-						videoFrame = VideoFrameItemQueue.poll();
-						videoPTS = (long)videoFrame.getTimestamp() * 1000000; 
-						mVideoDecoder.decode(videoFrame.getData(), videoPTS);
-					}
-						
-					}catch(Exception e) {
-						e.printStackTrace();
+						VideoFrameItem videoFrame = VideoFrameItemQueue.poll();
+						long videoPTS = (long)videoFrame.getTimestamp() * 1000000; 
+						if(decodeListener != null)
+							decodeListener.onVideoDataDecoding(videoFrame.getData(), videoPTS);
 					}
 				}
+				
 			}
 		}
 	}

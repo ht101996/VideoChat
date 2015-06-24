@@ -20,6 +20,7 @@ public class AACDecoder extends AudioDecoderBase implements Runnable{
 	
 	private AudioTrack player;
 	private MediaCodec audioCodec;  
+	private MediaFormat format;
 	private short audioFormat = AudioFormat.ENCODING_PCM_16BIT;
     private short channelConfig = AudioFormat.CHANNEL_IN_MONO;
 	
@@ -52,9 +53,9 @@ public class AACDecoder extends AudioDecoderBase implements Runnable{
 	
 	private boolean initDecoder() {
 		try{
-			MediaFormat format = getMediaFormat();
+			format = getMediaFormat();
 			audioCodec = MediaCodec.createDecoderByType("audio/mp4a-latm");
-			audioCodec.configure(format, null, null, 0);
+			
 		}catch(Exception e){
 			return false;
 		}
@@ -104,7 +105,7 @@ public class AACDecoder extends AudioDecoderBase implements Runnable{
         	ByteBuffer inputBuffer, outputBuffer;
         	byte[] outData;
             int inputBufferIndex = audioCodec.dequeueInputBuffer(-1);
-            Log.d(Tag,"mediaCodec input buffer index= " + inputBufferIndex+", input data length:"+data.length);
+            Log.d(Tag,"AACDecoder, mediaCodec input buffer index= " + inputBufferIndex+", input data length:"+data.length);
             if (inputBufferIndex >= 0)
             {
             	inputBuffer = inputBuffers[inputBufferIndex];
@@ -118,9 +119,7 @@ public class AACDecoder extends AudioDecoderBase implements Runnable{
 
             while (outputBufferIndex >= 0)
             {
-//            	TimeMonitor.audioDecodePresentationTimeUs = bufferInfo.presentationTimeUs;
-//            	TimeMonitor.printDecodeInterval();
-            	System.out.println("<--cxd, decode audio in java presentationTimeUs:"+(float)bufferInfo.presentationTimeUs/1000000 );
+//            	System.out.println("<--cxd, decode audio in java presentationTimeUs:"+(float)bufferInfo.presentationTimeUs/1000000 );
             	
                 outputBuffer = outputBuffers[outputBufferIndex];
 
@@ -185,7 +184,6 @@ public class AACDecoder extends AudioDecoderBase implements Runnable{
 //        int noOutputCounterLimit = 10;
 //        
 ////        while (!sawOutputEOS && noOutputCounter < noOutputCounterLimit) {
-//        	Log.e(Tag, "cxd loop start...");
 ////        	noOutputCounter++;
 //        	// read a buffer before feeding it to the decoder
 //            if (!sawInputEOS) {
@@ -205,18 +203,15 @@ public class AACDecoder extends AudioDecoderBase implements Runnable{
 //                    	else
 //                    		presentationTimeUs = 1000*(System.currentTimeMillis() - startTime);//extractor.getSampleTime();
 //                    }
-//   System.out.println("cxd, presentationTimeUs="+presentationTimeUs);
 //                	mediaCodec.queueInputBuffer(inputBufIndex, 56, inputBytes.length-56, presentationTimeUs, presentationTimeUs == 0 ? MediaCodec.BUFFER_FLAG_CODEC_CONFIG : 0);
 //                	
 //                    
 //                } else {
-//                	Log.e(Tag, "cxd inputBufIndex " +inputBufIndex);
 //                }
 //            } // !sawInputEOS
 //try{
 //            // decode to PCM and push it to the AudioTrack player
 //            int res = mediaCodec.dequeueOutputBuffer(info, 100000);
-//            Log.d(Tag, "cxd  dequeue from codec, return "+res);
 //            if (res >= 0) {
 //                if (info.size > 0)  noOutputCounter = 0;
 //                
@@ -236,24 +231,19 @@ public class AACDecoder extends AudioDecoderBase implements Runnable{
 //                }
 //                mediaCodec.releaseOutputBuffer(outputBufIndex, false);
 //                if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-//                    Log.d(Tag, "cxd saw output EOS.");
 //                    sawOutputEOS = true;
 //                }
 //            } else if (res == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED) {
 //                codecOutputBuffers = mediaCodec.getOutputBuffers();
-//                Log.d(Tag, "cxd output buffers have changed.");
 //            } else if (res == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
 //                MediaFormat oformat = mediaCodec.getOutputFormat();
-//                Log.d(Tag, "cxd output format has changed to " + oformat);
 //            } else {
-//                Log.d(Tag, "cxd dequeueOutputBuffer returned " + res);
 //            }
 ////        }
 //}catch(Exception e)
 //{
 //	e.printStackTrace();
 //}
-//        Log.d(Tag, "cxd stopping...");
 //	}
 	
 	
@@ -274,6 +264,7 @@ public class AACDecoder extends AudioDecoderBase implements Runnable{
 
 	private void innerStart() {
 		if(audioCodec != null) {
+			audioCodec.configure(format, null, null, 0);
         	audioCodec.start();
 		}
 		
@@ -283,6 +274,10 @@ public class AACDecoder extends AudioDecoderBase implements Runnable{
 		bStop = false;
 	}
 	
+	public void reset() {
+		stop();
+		innerStart();
+	}
 	
 //	private LinkedBlockingQueue<byte[]> inputByteQueue = new LinkedBlockingQueue<byte[]>(10);
 //	public void onFrame(byte[] buf, int offset, int length, double timestamp) {

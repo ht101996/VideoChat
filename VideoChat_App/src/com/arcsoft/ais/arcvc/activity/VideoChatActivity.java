@@ -27,6 +27,7 @@ import android.os.Message;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
+import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
@@ -45,6 +46,10 @@ import com.arcsoft.ais.arcvc.utils.Global;
 import com.arcsoft.ais.arcvc.utils.MyBitmap;
 import com.arcsoft.ais.arcvc.utils.P2PClientManager;
 import com.arcsoft.ais.arcvc.utils.audio.receiver.AudioPlayer;
+import com.es.app.videochat.recorder.ESRecordListener;
+import com.es.app.videochat.recorder.ESRecordListener.OnEncoderListener;
+import com.es.app.videochat.recorder.H264Decoder;
+import com.es.app.videochat.recorder.MediaDataCenter;
 
 public class VideoChatActivity extends Activity implements View.OnClickListener{
 	private final String tag = VideoChatActivity.class.getSimpleName();
@@ -71,13 +76,13 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		setContentView(R.layout.activity_video_chat);
 		getUserInfo();
 		initUI();
-		// startRTPSession
-		initP2PClien();
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 	}
 
 	private void initP2PClien() {
+		Log.d(tag, "initP2PClien1");
 		p2pClient = P2PClientManager.getP2PClientInstance();
+		Log.d(tag, "initP2PClien2");
 		p2pClient.startRTPSession(remotePeerId);
 	}
 	
@@ -150,28 +155,54 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	}
 	
 	private void addCameraFragment() {
-		cameraFragment = new CameraFragment(320, 240, 15);
-//		cameraFragment.setEncoderListener(encoderListener);
+		cameraFragment = new CameraFragment(CameraUtils.previewSize_width, CameraUtils.previewSize_Height, 15);
 		FragmentTransaction ft = getFragmentManager().beginTransaction();
 		ft.add(R.id.camera_fragment, cameraFragment);
 		ft.commit();
 		
 	}
 	//for test
-//	private H264Decoder decoder;
-//	private void startDecode(Surface surface) {
-//		decoder = new H264Decoder(320, 240, 15);
-//		decoder.setupDecoder(surface);
-//	}
+	private H264Decoder decoder;
+	private MediaDataCenter mDataCenter;
+	private void startDecode(Surface surface) {
+		decoder = new H264Decoder(CameraUtils.previewSize_width, CameraUtils.previewSize_Height, 15);
+		decoder.setupDecoder(surface);
+		decoder.startDecoder();
 	
-//	private OnEncoderListener encoderListener = new OnEncoderListener() {
-//		
-//		@Override
-//		public void onEncodeFinished(byte[] data, int length) {
-//			decoder.onFrame(data, 0, length, 0);
-//			
-//		}
-//	};
+		mDataCenter = MediaDataCenter.getInstance(mDataDecodeListener, false);
+		mDataCenter.start();
+		
+		cameraFragment.setEncoderListener(encoderListener);
+	}
+	private OnEncoderListener  encoderListener = new OnEncoderListener() {
+
+		@Override
+		public void onEncodeFinished(byte[] data, long timestamp) {
+			mDataCenter.addVideoFrame(new MediaDataCenter.VideoFrameItem(data, 0, data.length, timestamp));
+			
+		}
+		
+	};
+	private MediaDataCenter.DataDecodeListener mDataDecodeListener  = new MediaDataCenter.DataDecodeListener() {
+
+		@Override
+		public void onAudioDataDecoding(byte[] data, long timestampUs) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void onVideoDataDecoding(byte[] data, long timestampUs) {
+			try{ 
+				decoder.decode(data, timestampUs);
+			}catch(Exception e) {
+				e.printStackTrace();
+				decoder.resetDecoder();
+			}
+		}
+		
+	};
+	
 	private void startChat() {
 		if(cameraFragment != null)
 			cameraFragment.startSendData();
@@ -179,7 +210,13 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		startAudioRecord();
 //		startDecode(new Surface(mPlaybackView.getSurfaceTexture()));//TODO add test surface 
 	}
-	
+	private void stopChat() {
+		bSendingAudio = false;
+		if(cameraFragment == null)
+			return;
+		cameraFragment.stopSendData();
+		
+	}
 //	private static MediaRecorder mMediaAudioRecorder;
 //	private void startMediaRecordAudio() {
 //		mMediaAudioRecorder = CameraUtils.initAudioRecorder(mMediaAudioRecorder);
@@ -246,7 +283,6 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
     }
     private String filePath = Environment.getExternalStorageDirectory().getPath().concat(File.separator).concat("sending.m4p");
     
-    long firstReceivedTime = 0;
 	private boolean startAudioRecord() {
 		int rate = findAudioRecord();
         if (rate == -1) 
@@ -301,10 +337,6 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
                         int read = recorder.read(buffer1, 0, bufferSize);
                         if(AudioRecord.ERROR_INVALID_OPERATION == read || AudioRecord.ERROR_BAD_VALUE == read)
                         	break;
-                        if(firstReceivedTime == 0) {
-                        	firstReceivedTime = System.currentTimeMillis();
-                        	System.out.println("---cxd, audio firstReceivedTime :"+firstReceivedTime);
-                        }
 
                         inputBuffers = encoder.getInputBuffers();
                         outputBuffers = encoder.getOutputBuffers();
@@ -316,7 +348,6 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 
                             inputBuffer.put(buffer1);
                             long pts = getJitterFreePTS(System.nanoTime() / 1000, read / 2);
-                            System.out.println("<--cxd, audio pts: "+pts);
                             encoder.queueInputBuffer(inputBufferIndex, 0, buffer1.length, pts, 0);
                         }
 
@@ -325,9 +356,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 
                         while (outputBufferIndex >= 0)
                         {
-                        	System.out.println("<--cxd, encode audio presentationTimeUs:"+(float)bufferInfo.presentationTimeUs / 1000000+",current time:"+System.nanoTime());
-//                        	TimeMonitor.audioEncodePresentationTimeUs = bufferInfo.presentationTimeUs;            				
-//                        	TimeMonitor.printEncodeInterval();
+//                        	System.out.println("<--cxd, encode audio presentationTimeUs:"+(float)bufferInfo.presentationTimeUs / 1000000+",current time:"+System.nanoTime());
                         	
                             outputBuffer = outputBuffers[outputBufferIndex];
                             outputBuffer.position(bufferInfo.offset);
@@ -411,33 +440,18 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
         totalSamplesNum += bufferSamplesNum;
         return correctedPts;
     }
-	private void stopChat() {
-		bSendingAudio = false;
-		if(cameraFragment == null)
-			return;
-		cameraFragment.stopSendData();
-//		FragmentTransaction ft = getFragmentManager().beginTransaction();
-//		ft.remove(cameraFragment);
-//		ft.commit();
-//		cameraFragment = null;
-		
-	}
-	
-
 
 	@Override
 	protected void onResume() {
 		super.onResume();
-		Log.i(Global.TAG, "VideoActivity --------------onResume!");
+		initP2PClien();
 	};
 
 	@Override
 	protected void onPause() {
 		super.onPause();
-		Log.i(Global.TAG, "VideoActivity --------------onPause!");
 		bSendingAudio = false;
-//		releaseMediaRecorder();
-//		mAudioRecorderWrapper.releaseRecorder();
+		p2pClient.uninit();
 	};
 
 	@Override
@@ -493,24 +507,24 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		return super.onKeyUp(keyCode, event);
 	}
 	
-	@Override
-	public boolean onCreateOptionsMenu(Menu menu) {
-		// Inflate the menu; this adds items to the action bar if it is present.
-		getMenuInflater().inflate(R.menu.video, menu);
-		return true;
-	}
+//	@Override
+//	public boolean onCreateOptionsMenu(Menu menu) {
+//		// Inflate the menu; this adds items to the action bar if it is present.
+//		getMenuInflater().inflate(R.menu.video, menu);
+//		return true;
+//	}
 	
-	public void onImageViewClickEvent(View view) {
-		LayoutParams mParams = null ;
-		if (!isFriendVideoZoomIn) {
-			mParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-			isFriendVideoZoomIn = true ;
-		} else {
-			mParams = new LayoutParams(DensityUtil.dip2px(getApplicationContext(), 240), DensityUtil.dip2px(getApplicationContext(), 320));
-			isFriendVideoZoomIn = false ;
-		}
-		view.setLayoutParams(mParams);
-	}
+//	public void onImageViewClickEvent(View view) {
+//		LayoutParams mParams = null ;
+//		if (!isFriendVideoZoomIn) {
+//			mParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+//			isFriendVideoZoomIn = true ;
+//		} else {
+//			mParams = new LayoutParams(DensityUtil.dip2px(getApplicationContext(), 240), DensityUtil.dip2px(getApplicationContext(), 320));
+//			isFriendVideoZoomIn = false ;
+//		}
+//		view.setLayoutParams(mParams);
+//	}
 
 	public void onSurfaceViewClickEvent(View view) {
 //		LayoutParams mParams = null ;
@@ -561,9 +575,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 								public void onClick(DialogInterface dialog, int which) {
 									Log.i(Global.TAG, "p2p sendMsg>>>..from peerId======" + currentPeerId);
 									Log.i(Global.TAG, "p2p sendMsg>>>..to peerId======" + remotePeerId);
-									String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST,
-											Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_REJECT, "Reject");
-									P2PClientManager.getP2PClientInstance().sendMsg(remotePeerId, message);
+									P2PClientManager.getP2PClientInstance().rejectVideoChat(remotePeerId);
 									Log.i(Global.TAG, "Reject====");
 
 									dialog.cancel();// 取消弹出框
@@ -590,7 +602,6 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 				} else if(msgCode.equals(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_END)){
 					Log.i(Global.TAG, "msgCode  MSG_TYPE_VIDEO_CHATTING_REQUEST_END===="+msgCode);
 //					releaseMediaRecorder();
-					CameraUtils.setUsingCam(false) ;
 //					audioWrapper.stopRecord();
 				}
 

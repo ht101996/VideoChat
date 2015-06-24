@@ -23,12 +23,9 @@ import android.widget.EditText;
 import android.widget.TextView;
 
 import com.arcsoft.ais.arcvc.R;
-import com.arcsoft.ais.arcvc.service.BootupService;
 import com.arcsoft.ais.arcvc.utils.Configer;
 import com.arcsoft.ais.arcvc.utils.Global;
-import com.arcsoft.ais.arcvc.utils.NetworkUtils;
 import com.arcsoft.ais.arcvc.utils.SdCardUtils;
-import com.arcsoft.ais.arcvc.utils.audio.AudioWrapper;
 import com.arcsoft.coreapi.sdk.CoreVCAPI;
 import com.arcsoft.coreapi.sdk.CoreVCDef.LoginParam;
 import com.arcsoft.coreapi.sdk.CoreVCDef.LoginResponse;
@@ -78,7 +75,7 @@ public class LoginActivity extends Activity {
 		try {
 			//for c
 			String sdCardPath = SdCardUtils.getSdCardPath();
-			String gpid = BootupService.initIniFile(getAssets(), sdCardPath, getApplicationContext());
+			String gpid = SdCardUtils.initIniFile(getAssets(), sdCardPath, getApplicationContext());
 			//Log.i(Global.TAG, "macAddress:" + CommonUtils.getLocalMacAddressFromIp(context));
 			//Configer.setValue("device_id", CommonUtils.getLocalMacAddressFromIp(getApplicationContext()));
 			Configer.setValue("peer_id", gpid);

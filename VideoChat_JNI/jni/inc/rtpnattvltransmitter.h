@@ -228,6 +228,8 @@ public:
 	RTPNATTVLTransmitter(RTPMemoryManager *mgr);
 	~RTPNATTVLTransmitter();
 
+	void AddToRawList(RTPRawPacket * pack);
+
 	int Init(bool treadsafe);
 	int Create(size_t maxpacksize,  RTPTransmissionParams *transparams);
 	void Destroy();

@@ -12,7 +12,7 @@ extern "C" {
  * Method:    init
  * Signature: (Ljava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_init
+JNIEXPORT void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_nativeInit
   (JNIEnv *, jobject, jstring);
 
 /*
@@ -20,7 +20,7 @@ JNIEXPORT void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_init
  * Method:    uninit
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit
+JNIEXPORT void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_nativeUninit
   (JNIEnv *, jobject);
 
 /*

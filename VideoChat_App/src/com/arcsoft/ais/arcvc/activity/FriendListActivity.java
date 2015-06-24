@@ -1,29 +1,19 @@
 package com.arcsoft.ais.arcvc.activity;
 
-import java.lang.ref.WeakReference;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import android.os.Environment;
-import android.os.Handler;
-import android.os.Message;
-import android.text.Editable;
 import android.util.Log;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.AdapterView.OnItemSelectedListener;
@@ -37,17 +27,14 @@ import com.arcsoft.ais.arcvc.R;
 import com.arcsoft.ais.arcvc.adapter.ViewAdapter;
 import com.arcsoft.ais.arcvc.bean.FriendOnlineStatus;
 import com.arcsoft.ais.arcvc.bean.PeerIdOnlineStatus;
-import com.arcsoft.ais.arcvc.jni.P2PClient;
 import com.arcsoft.ais.arcvc.utils.Configer;
 import com.arcsoft.ais.arcvc.utils.Global;
 import com.arcsoft.ais.arcvc.utils.MyBitmap;
 import com.arcsoft.ais.arcvc.utils.OnlineStatusDetector;
-import com.arcsoft.ais.arcvc.utils.P2PClientManager;
 import com.arcsoft.coreapi.sdk.CoreVCAPI;
 import com.arcsoft.coreapi.sdk.CoreVCDef.FriendListResponse;
 import com.arcsoft.coreapi.sdk.CoreVCDef.FriendResponse;
 import com.arcsoft.coreapi.sdk.CoreVCDef.PeerIdResponse;
-import com.arcsoft.coreapi.sdk.CoreVCDef.VCParam;
 
 /**
  * Activity which displays FriendListActivity screen to the user
@@ -68,19 +55,19 @@ public class FriendListActivity extends Activity {
 	private static String friendNickname;
 	Map<String,FriendOnlineStatus> friendOnlineStatusMap = new HashMap<String,FriendOnlineStatus>();
 	List<Map<String, Object>> listItem = new ArrayList<Map<String, Object>>(); 
-	private P2PClient.OnlineStateDetectionListener onlineListener = new P2PClient.OnlineStateDetectionListener() {
-
-		@Override
-		public void onAckDetected(String arg0, String arg1) {
-			OnlineStatusDetector.setOnlineStatus(arg0, arg1, Global.FRIEND_ONLINE_STATUS_ONLINE);
-		}
-
-		@Override
-		public void onheartbeatDetected(String arg0, String arg1) {
-			P2PClientManager.getP2PClientInstance().sendMsg(arg0, arg1);
-		}
-		
-	};
+//	private P2PClient.OnlineStateDetectionListener onlineListener = new P2PClient.OnlineStateDetectionListener() {
+//
+//		@Override
+//		public void onAckDetected(String arg0, String arg1) {
+//			OnlineStatusDetector.setOnlineStatus(arg0, arg1, Global.FRIEND_ONLINE_STATUS_ONLINE);
+//		}
+//
+//		@Override
+//		public void onheartbeatDetected(String arg0, String arg1) {
+//			P2PClientManager.getP2PClientInstance().sendMsg(arg0, arg1);
+//		}
+//		
+//	};
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);		
@@ -166,15 +153,15 @@ public class FriendListActivity extends Activity {
 //		Log.i(Global.TAG, "getLocalGpid============" + localGpid);
 //		Configer.setValue("peer_id", localGpid);
 		currentPeerId = Configer.getValue("peer_id");
-		P2PClientManager.getP2PClientInstance().setOnlineStateDetectionListener(onlineListener);
+//		P2PClientManager.getP2PClientInstance().setOnlineStateDetectionListener(onlineListener);
 		Log.i(Global.TAG, "FriendListActivity: onCreate============finished!");
 	}
 	
 	@Override
     protected void onPostCreate(Bundle savedInstanceState) {
 		super.onPostCreate(savedInstanceState);
-		Thread mThread = new Thread(new OnlineStatusDetector(viewAdapter, listItem, this, friendOnlineStatusMap, handler, currentPeerId));
-	    mThread.start();
+//		Thread mThread = new Thread(new OnlineStatusDetector(viewAdapter, listItem, this, friendOnlineStatusMap, handler, currentPeerId));
+//	    mThread.start();
     }
 
 	@Override
@@ -280,129 +267,123 @@ public class FriendListActivity extends Activity {
 
 		}
 
-		private final MyHandler handler = new MyHandler(this);
-		public Handler getHandler() {
-			return handler;
-		}
-		 private static class MyHandler extends Handler {
-//		private static Handler handler = new Handler() {
-			private final WeakReference<Activity> myActivity;
-			public MyHandler(FriendListActivity activity) {
-			      myActivity = new WeakReference<Activity>(activity);
-			}
-			SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd-HH:mm:ss"); 
-
-			@Override
-			public void handleMessage(Message msg) {
-				if (msg == null) {
-					return ;
-				}
-				//Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..msg.what:"+msg.what);
-				Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..msg:"+msg.getData().getString("msg"));
-				//Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..currentPeerId:"+currentPeerId);
-				
-				if (3 == msg.what) {
-					Map<String, String> msgMap = Global.parseMsg(msg.getData().getString("msg"));
-					String msgType = msgMap.get("msg_type");
-					if (Global.MSG_TYPE_ONLINE_STATUS_DETECT.equals(msgType)) {
-						String msgCode = msgMap.get("msg_code");
-						if (Global.MSG_TYPE_ONLINE_STATUS_DETECT_ACK.equals(msgCode)) {
-							String str[] = msgMap.get("msg").split(",");
-							OnlineStatusDetector.setOnlineStatus(str[0], str[1] , Global.FRIEND_ONLINE_STATUS_ONLINE);
-						}else if(Global.MSG_TYPE_ONLINE_STATUS_DETECT_HEARTBEAT.equals(msgCode)){
-							String str[] = msgMap.get("msg").split(",");
-		            		String message = Global.catMsg(Global.MSG_TYPE_ONLINE_STATUS_DETECT , Global.MSG_TYPE_ONLINE_STATUS_DETECT_ACK ,
-		            				str[0] + "," + str[1]);
-		            		//Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..message:"+message);
-		            		P2PClientManager.getP2PClientInstance().sendMsg(str[1], message);
-		            		//Log.i(Global.TAG, "OnlineStatusDetector sendMsg===successful=");
-						}
-					}
-				 }
-				
-				if (4 == msg.what) {
-					Map<String, Object> map = new HashMap<String, Object>();
-					map = (Map<String, Object>) msg.obj;
-					int index = msg.arg1;
-					//Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..map:"+map);
-					//Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..msg.arg1:"+msg.arg1);
-					viewAdapter.changeImage(index, map);
-				}
-				
-				FriendListActivity activity = (FriendListActivity) myActivity.get();
-				if (activity != null) {
-					 //handleMessage
-					if (msg!=null) {
-						handlerHandleMsg(msg,activity);
-					}
-				}
-			}
-		};
-		
-		private static void handlerHandleMsg(Message msg,final FriendListActivity activity) {
-			if (msg.what == 1) {
-				remotePeerId = msg.getData().getString("gpid");
-				//Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..current peerId:======" + currentPeerId);
-				//Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..from peerId:======" + remotePeerId);
-				//Log.i(Global.TAG, "VideoActivity Handler handleMessage>>>..msg:======" + msg.getData().getString("msg"));
-				if (remotePeerId.equals(currentPeerId)) {
-					return;
-				}
-				Map<String, String> msgMap = Global.parseMsg(msg.getData().getString("msg"));
-				String msgType = msgMap.get("msg_type");
-				String msgContent = msgMap.get("msg");
-				friendNickname = msgContent ;
-				//Log.i(Global.TAG, " MSG_TYPE_VIDEO_CHATTING_REQUEST>>>..msgType======" + msgType);
-				//Log.i(Global.TAG, " MSG_TYPE_VIDEO_CHATTING_REQUEST>>>..msgContent======" + msgContent);
-				if (Global.MSG_TYPE_VIDEO_CHATTING_REQUEST.equals(msgType)) {
-					// ///////////////////////////////////////////////////////////////////////
-					// MSG_TYPE_VIDEO_CHATTING_REQUEST
-					// alertDialog(nickname) ;
-					String msgCode = msgMap.get("msg_code");
-					//Log.i(Global.TAG, " MSG_TYPE_VIDEO_CHATTING_REQUEST>>>..msgCode======" + msgCode);
-					if (msgCode.equals(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_APPLY)) {
-						alertDialogBuilder.setTitle("Video Chatting Request").setIcon(android.R.drawable.ic_dialog_info)
-								.setMessage(friendNickname + " want to Video chat with you,would you like to accept it? ")
-								.setPositiveButton("Accept", new DialogInterface.OnClickListener() {
-									@Override
-									public void onClick(DialogInterface dialog, int which) {
-										// 转跳到另外一个Activity
-										//Log.i(Global.TAG, "p2p sendMsg>>>..from peerId======" + currentPeerId);
-										//Log.i(Global.TAG, "p2p sendMsg>>>..to peerId======" + remotePeerId);
-										String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST,
-												Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_ACCEPT, "Accept");
-										P2PClientManager.getP2PClientInstance().sendMsg(remotePeerId, message);
-										//startCameraRecording() ;
-										 Intent intent = new Intent();
-									        intent.putExtra("friendUserId",11l);   
-									        intent.putExtra("friendNickname",friendNickname);  
-									        intent.putExtra("startCameraRecordingFlag",Global.START_CAMERA_RECORDING_FLAG_YES);  
-									        ArrayList<String> peerIdsListItem = new ArrayList<String>();
-									        peerIdsListItem.add(remotePeerId);
-									        intent.putExtra("friendPeerIds", peerIdsListItem);
-									        /* 指定intent要启动的类 */
-									        intent.setClass(activity, VideoActivity.class);
-									        /* 启动一个新的Activity */
-									        activity.startActivity(intent);
-									        /* 关闭当前的Activity */
-									        activity.finish();
-									      //Log.i(Global.TAG, "Accept====");
-									}
-								}).setNegativeButton("Reject", new DialogInterface.OnClickListener() {
-									public void onClick(DialogInterface dialog, int which) {
-										//Log.i(Global.TAG, "p2p sendMsg>>>..from peerId======" + currentPeerId);
-										//Log.i(Global.TAG, "p2p sendMsg>>>..to peerId======" + remotePeerId);
-										String message = Global.catMsg(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST,
-												Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_REJECT, "Reject");
-										P2PClientManager.getP2PClientInstance().sendMsg(remotePeerId, message);
-										//Log.i(Global.TAG, "Reject====");
-										dialog.cancel();// 取消弹出框
-									}
-								}).create().show();
-					} 
-				}
-			}
-		}
+//		private final MyHandler handler = new MyHandler(this);
+//		public Handler getHandler() {
+//			return handler;
+//		}
+//		 private static class MyHandler extends Handler {
+////		private static Handler handler = new Handler() {
+//			private final WeakReference<Activity> myActivity;
+//			public MyHandler(FriendListActivity activity) {
+//			      myActivity = new WeakReference<Activity>(activity);
+//			}
+//			SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd-HH:mm:ss"); 
+//
+//			@Override
+//			public void handleMessage(Message msg) {
+//				if (msg == null) {
+//					return ;
+//				}
+//				//Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..msg.what:"+msg.what);
+//				Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..msg:"+msg.getData().getString("msg"));
+//				//Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..currentPeerId:"+currentPeerId);
+//				
+//				if (3 == msg.what) {
+//					Map<String, String> msgMap = Global.parseMsg(msg.getData().getString("msg"));
+//					String msgType = msgMap.get("msg_type");
+//					if (Global.MSG_TYPE_ONLINE_STATUS_DETECT.equals(msgType)) {
+//						String msgCode = msgMap.get("msg_code");
+//						if (Global.MSG_TYPE_ONLINE_STATUS_DETECT_ACK.equals(msgCode)) {
+//							String str[] = msgMap.get("msg").split(",");
+//							OnlineStatusDetector.setOnlineStatus(str[0], str[1] , Global.FRIEND_ONLINE_STATUS_ONLINE);
+//						}else if(Global.MSG_TYPE_ONLINE_STATUS_DETECT_HEARTBEAT.equals(msgCode)){
+//							String str[] = msgMap.get("msg").split(",");
+//		            		String message = Global.catMsg(Global.MSG_TYPE_ONLINE_STATUS_DETECT , Global.MSG_TYPE_ONLINE_STATUS_DETECT_ACK ,
+//		            				str[0] + "," + str[1]);
+//		            		P2PClientManager.getP2PClientInstance().sendMsg(str[1], message);
+//						}
+//					}
+//				 }
+//				
+//				if (4 == msg.what) {
+//					Map<String, Object> map = new HashMap<String, Object>();
+//					map = (Map<String, Object>) msg.obj;
+//					int index = msg.arg1;
+//					//Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..map:"+map);
+//					//Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..msg.arg1:"+msg.arg1);
+//					viewAdapter.changeImage(index, map);
+//				}
+//				
+//				FriendListActivity activity = (FriendListActivity) myActivity.get();
+//				if (activity != null) {
+//					 //handleMessage
+//					if (msg!=null) {
+//						handlerHandleMsg(msg,activity);
+//					}
+//				}
+//			}
+//		};
+//		
+//		private static void handlerHandleMsg(Message msg,final FriendListActivity activity) {
+//			if (msg.what == 1) {
+//				remotePeerId = msg.getData().getString("gpid");
+//				//Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..current peerId:======" + currentPeerId);
+//				//Log.i(Global.TAG, "FriendListActivity Handler handleMessage>>>..from peerId:======" + remotePeerId);
+//				//Log.i(Global.TAG, "VideoActivity Handler handleMessage>>>..msg:======" + msg.getData().getString("msg"));
+//				if (remotePeerId.equals(currentPeerId)) {
+//					return;
+//				}
+//				Map<String, String> msgMap = Global.parseMsg(msg.getData().getString("msg"));
+//				String msgType = msgMap.get("msg_type");
+//				String msgContent = msgMap.get("msg");
+//				friendNickname = msgContent ;
+//				//Log.i(Global.TAG, " MSG_TYPE_VIDEO_CHATTING_REQUEST>>>..msgType======" + msgType);
+//				//Log.i(Global.TAG, " MSG_TYPE_VIDEO_CHATTING_REQUEST>>>..msgContent======" + msgContent);
+//				if (Global.MSG_TYPE_VIDEO_CHATTING_REQUEST.equals(msgType)) {
+//					// ///////////////////////////////////////////////////////////////////////
+//					// MSG_TYPE_VIDEO_CHATTING_REQUEST
+//					// alertDialog(nickname) ;
+//					String msgCode = msgMap.get("msg_code");
+//					//Log.i(Global.TAG, " MSG_TYPE_VIDEO_CHATTING_REQUEST>>>..msgCode======" + msgCode);
+//					if (msgCode.equals(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_APPLY)) {
+//						alertDialogBuilder.setTitle("Video Chatting Request").setIcon(android.R.drawable.ic_dialog_info)
+//								.setMessage(friendNickname + " want to Video chat with you,would you like to accept it? ")
+//								.setPositiveButton("Accept", new DialogInterface.OnClickListener() {
+//									@Override
+//									public void onClick(DialogInterface dialog, int which) {
+//										// 转跳到另外一个Activity
+//										//Log.i(Global.TAG, "p2p sendMsg>>>..from peerId======" + currentPeerId);
+//										//Log.i(Global.TAG, "p2p sendMsg>>>..to peerId======" + remotePeerId);
+//										P2PClientManager.getP2PClientInstance().acceptVideoChat(remotePeerId);
+//										//startCameraRecording() ;
+//										 Intent intent = new Intent();
+//									        intent.putExtra("friendUserId",11l);   
+//									        intent.putExtra("friendNickname",friendNickname);  
+//									        intent.putExtra("startCameraRecordingFlag",Global.START_CAMERA_RECORDING_FLAG_YES);  
+//									        ArrayList<String> peerIdsListItem = new ArrayList<String>();
+//									        peerIdsListItem.add(remotePeerId);
+//									        intent.putExtra("friendPeerIds", peerIdsListItem);
+//									        /* 指定intent要启动的类 */
+//									        intent.setClass(activity, VideoActivity.class);
+//									        /* 启动一个新的Activity */
+//									        activity.startActivity(intent);
+//									        /* 关闭当前的Activity */
+//									        activity.finish();
+//									      //Log.i(Global.TAG, "Accept====");
+//									}
+//								}).setNegativeButton("Reject", new DialogInterface.OnClickListener() {
+//									public void onClick(DialogInterface dialog, int which) {
+//										//Log.i(Global.TAG, "p2p sendMsg>>>..from peerId======" + currentPeerId);
+//										//Log.i(Global.TAG, "p2p sendMsg>>>..to peerId======" + remotePeerId);
+//										P2PClientManager.getP2PClientInstance().rejectVideoChat(remotePeerId);
+//										//Log.i(Global.TAG, "Reject====");
+//										dialog.cancel();// 取消弹出框
+//									}
+//								}).create().show();
+//					} 
+//				}
+//			}
+//		}
 		
 	// 使用数组形式操作
 //	class SpinnerOnTouchListener implements OnTouchListener {

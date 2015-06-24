@@ -19,9 +19,6 @@
 #define WINAPI
 #define interface		class
 #define PURE			= 0
-#ifndef NULL
-#define NULL			0
-#endif
 #define E_INVALIDARG	-1
 #define E_OUTOFMEMORY	-2
 #define E_FAIL			-3
@@ -38,6 +35,7 @@ typedef int *			LPARAM;
 enum {
 	MSG_TYPE_DEFAULT = 0,
 	MSG_TYPE_DEFAULT_ACK = 1,
+	MSG_TYPE_DEFAULT_CFR = 2,
 	MSG_TYPE_UFTP_BEGIN = 9,
 	MSG_TYPE_UFTP_ACTIVE_PUT,		  //the file receiver will recv this message from uftp module, by cm.
 	/*
@@ -51,6 +49,7 @@ enum {
 	MSG_TYPE_RTCP_VIDEO,
 	MSG_TYPE_RTCP_AUDIO,
 
+
 	MSG_TYPE_MAX = 253
 };
 
@@ -63,6 +62,14 @@ typedef struct App_File_Upload_ACK_st{
 	UFTP_APP_Notification_Type errorCode;
 } App_File_Upload_ACK;
 #endif
+
+typedef struct conference
+{
+	Sint32 m_cfrID;
+	Sint32 m_status;
+	Sint32 m_clientNum;
+	Uint8 m_clientGPID[12][POS_UUID_LEN];
+} conference;
 
 /*
 *	Call back of cm, used for receiving data from network.
@@ -80,7 +87,9 @@ public:
 		) PURE;
 
 };
-
+/*
+*	Call back of RTP , used for receiving rtp data from network.
+*/
 interface IRTPCallBack
 {
 public:
@@ -137,7 +146,22 @@ public:
 	 *
 	 */
 	virtual HRESULT WINAPI Init(char *configPath, ICMClientCallBack *pCallBack, void *user) PURE;
-
+	
+	/*
+	 *    Name: RTPInit
+	 *    Description:
+	 *        Interface for init p2p based rtp.
+	 *    Parameters:
+	 *      
+	 *        pCallBack : callback function for receiving rtp data form network.
+	 *		   videoUser: the class instance for processing rtp video data.
+	 *			 audioUser: the class instance for processing rtp audio data, can be null.
+	 *    Return:
+	 *        =0 : success.
+	 *        < 0 : failed, check the error number form p2p_errno.h.
+	 *    Remark:
+	 *
+	 */
 	virtual HRESULT WINAPI RTPInit(IRTPCallBack *pCallBack, void *videoUser, void *audioUser = NULL) PURE;
 
 	 /*
@@ -153,6 +177,35 @@ public:
 	 *
 	 */
 	virtual HRESULT WINAPI GetID(BYTE pID[20]) PURE;
+
+	/*
+	 *    Name: GetCFR
+	 *    Description:
+	 *        Interface for getting conference info.
+	 *    Parameters:
+	 *        pCFR : struct to conference include ID,client count and GPID of all client.
+	 *    Return:
+	 *        =0 : success.
+	 *        -1 : failed, currently conference is not constructed.
+	 *    Remark:
+	 *
+	 */
+	virtual HRESULT WINAPI GetCFR(conference *pCFR) PURE;
+
+	/*
+	 *    Name: SendCFRoperate
+	 *    Description:
+	 *        Interface for send conference operate.
+	 *    Parameters:
+	 *        opt : operate type(new, add, quit).
+	 *		  cfrID : conference ID.
+	 *    Return:
+	 *        =0 : success.
+	 *        <0 : failed, check the error number form p2p_errno.h.
+	 *    Remark:
+	 *
+	 */
+	virtual HRESULT WINAPI SendCFRoperate(Sint32 opt, Sint32 cfrID) PURE;
 
 	 /*
 	 *    Name: InitMsgcClient
@@ -185,6 +238,23 @@ public:
 	 *
 	 */
 	virtual HRESULT WINAPI SendTo(const char *buf, int len, unsigned char pID[20], unsigned char msgType = 0) PURE;
+
+	 /*
+	 *    Name: SendToCFR
+	 *    Description:
+	 *        Interface for send a piece of data to conference.
+	 *    Parameters:
+	 *        buf : msg payload
+	 *		  len: payload length in Byte.
+	 *        cfrID: conference ID.
+	 *		  msgType: message type of this message, for the convenience of parse and process the package.
+	 *    Return:
+	 *        =0 : success.
+	 *        <0 : failed, check the error number form p2p_errno.h.
+	 *    Remark:
+	 *
+	 */
+	virtual HRESULT WINAPI SendToCFR(const char *buf, int len, Sint32 cfrID, unsigned char msgType = 0) PURE;
 
 	 /*
 	 *    Name: SendTo
