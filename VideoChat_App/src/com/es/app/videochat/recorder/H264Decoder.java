@@ -132,7 +132,7 @@ public class H264Decoder extends VideoDecoderBase implements Runnable{
 	public void decode(byte[] data, long timestamp) {
 		
 		ByteBuffer[] inputBuffers = mediaCodec.getInputBuffers();
-		int inputBufferIndex = mediaCodec.dequeueInputBuffer(-1);
+		int inputBufferIndex = mediaCodec.dequeueInputBuffer(0);
 		Log.d(Tag,"H264Decoder, input buffer index= " + inputBufferIndex+", input data length:"+data.length+", timestamp:"+timestamp);
 		if (inputBufferIndex >= 0) {
 			ByteBuffer inputBuffer = inputBuffers[inputBufferIndex];

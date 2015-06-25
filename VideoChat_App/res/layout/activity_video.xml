@@ -8,13 +8,16 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context=".VideoActivity" >
 
-    <TextureView
-        android:id="@+id/PlaybackView"
+      <RelativeLayout
+        android:id="@+id/remote_display_fragment"
         android:layout_width="240dp"
         android:layout_height="320dp"
         android:layout_alignParentRight="true"
         android:layout_alignParentTop="true"
-        android:layout_marginTop="25dp" />
+        android:layout_marginRight="25dp"
+        android:layout_marginTop="15dp" >
+    </RelativeLayout>
+    
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -41,7 +44,6 @@
             android:layout_margin="5dp"
             android:layout_weight="1"
             android:background="@drawable/btn_style"
-            android:onClick="onApplyClickEvent"
             android:text="Request" />
 
         <Button

@@ -8,6 +8,7 @@ import java.util.Map;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.FragmentTransaction;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -26,6 +27,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import com.arcsoft.ais.arcvc.R;
+import com.arcsoft.ais.arcvc.fragment.RemoteDisplayFragment;
 import com.arcsoft.ais.arcvc.jni.P2PClient;
 import com.arcsoft.ais.arcvc.jni.P2PClient.DateReceivedListener;
 import com.arcsoft.ais.arcvc.utils.CameraUtils;
@@ -40,22 +42,24 @@ import com.es.app.videochat.recorder.MediaDataCenter;
 
 public class VideoActivity extends Activity implements View.OnClickListener{
 	private final static String tag = VideoActivity.class.getSimpleName();
-	static Button button_pause ;
-	static String friendNickname;
-	static String currentNickname;
-	static String startCameraRecordingFlag;
-	static String remotePeerId;
-	static String currentPeerId;
-	static List<String> peerIdsOfFriends;
-	private static Dialog applyAlertDialog;
-	private static AlertDialog.Builder alertDialogBuilder;
-	static int displayRotationDegree = 0 ;
-	static long friendUserId;
-	static ArrayList<String> friendPeerIds;
-	private TextureView mPlaybackView;
-	private MediaDataCenter mMediaDataCenter;
+	
+	private long friendUserId;
+	private Button button_pause ;
+	private String friendNickname;
+	private String currentNickname;
+	private String startCameraRecordingFlag;
+	private String remotePeerId;
+	private String currentPeerId;
+	private ArrayList<String> friendPeerIds;
+	private List<String> peerIdsOfFriends;
+	
+	private Dialog applyAlertDialog;
+	private AlertDialog.Builder alertDialogBuilder;
+	private RemoteDisplayFragment remoteFragment;
+//	private TextureView mPlaybackView;
+//	private MediaDataCenter mMediaDataCenter;
 	private P2PClient p2pClient;
-//	private static AudioPlayer audioPlayer = AudioPlayer.getInstance();
+	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -67,8 +71,6 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 		currentNickname = Configer.getValue("nickname");
 		friendPeerIds = intent.getStringArrayListExtra("friendPeerIds");
 		
-		displayRotationDegree = getWindowManager().getDefaultDisplay()
-	                .getRotation();
 		 
 		Log.i(tag, "friendUserId= " + friendUserId);
 		Log.i(tag, "friendNickname= " + friendNickname);
@@ -84,7 +86,7 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 			Log.i(tag, "friendPeerIds.get(0)>>>..." + friendPeerIds.get(0));
 		}
 		initUI();
-		initDecoders();
+//		initDecoders();
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 		Log.d(tag, "VideoActivity: oncreate============finished!");
 	}
@@ -94,32 +96,35 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 		findViewById(R.id.startBtn).setOnClickListener(this);
 		findViewById(R.id.stopBtn).setOnClickListener(this);
 		findViewById(R.id.requestBtn).setOnClickListener(this);
-		mPlaybackView = (TextureView) findViewById(R.id.PlaybackView);
-		mPlaybackView.setSurfaceTextureListener(new SurfaceTextureListener() {
-			
-			@Override
-			public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-			}
-			
-			@Override
-			public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width,
-					int height) {
-			}
-			
-			@Override
-			public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-				return false;
-			}
-			
-			@Override
-			public void onSurfaceTextureAvailable(SurfaceTexture surface, int width,
-					int height) {
-				Log.d(tag, "onSurfaceTextureAvailable");
-//				h264Decoder.setupDecoder(new Surface(mPlaybackView.getSurfaceTexture()));
-//				h264Decoder.startDecoder();
-				startH264Decoder();
-			}
-		});
+		
+		remoteFragment = new RemoteDisplayFragment();
+		FragmentTransaction ft = getFragmentManager().beginTransaction();
+		ft.add(R.id.remote_display_fragment, remoteFragment);
+		ft.commit();
+//		mPlaybackView = (TextureView) findViewById(R.id.PlaybackView);
+//		mPlaybackView.setSurfaceTextureListener(new SurfaceTextureListener() {
+//			
+//			@Override
+//			public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+//			}
+//			
+//			@Override
+//			public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width,
+//					int height) {
+//			}
+//			
+//			@Override
+//			public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+//				return false;
+//			}
+//			
+//			@Override
+//			public void onSurfaceTextureAvailable(SurfaceTexture surface, int width,
+//					int height) {
+//				Log.d(tag, "onSurfaceTextureAvailable");
+//				startH264Decoder();
+//			}
+//		});
 		AlertDialog.Builder applyAlertDialogBuilder = new AlertDialog.Builder(this);
 		applyAlertDialog = applyAlertDialogBuilder.setTitle("Video Chatting Request").setIcon(android.R.drawable.ic_dialog_info)
 				.setMessage("waiting for your friend to accept it ...").create();
@@ -136,19 +141,16 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 //			stopChat();
 			break;
 		case R.id.requestBtn:
-//			requestChat();
+			requestChat();
 			break;
 		default:
 			break;
 		}
 		
 	}
-	private void initP2PClien() {
-		Log.d(tag, "p2pClient.startRTPSession============0!");
+	private void initP2PClien(DateReceivedListener dateReceivedListener) {
 		p2pClient = P2PClientManager.getP2PClientInstance();
-		Log.d(tag, "p2pClient.startRTPSession============1!");
 		p2pClient.startRTPSession(remotePeerId);
-		Log.d(tag, "p2pClient.startRTPSession============2!");
 		p2pClient.setDateReceivedListener(dateReceivedListener);
 	}
 
@@ -174,37 +176,22 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 //
 //	};
 
-	/** Check if this device has a camera */
-	private static boolean checkCameraHardware(Context context) {
-		Log.i(tag, "VideoActivity: Camera.getNumberOfCameras()============" + Camera.getNumberOfCameras());
-		if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)) {
-			// this device has a camera
-			return true;
-		} else {
-			// no camera on this device
-			return false;
-		}
-	}
-
 
 	@Override
 	protected void onResume() {
 		super.onResume();
-		initP2PClien();
-		mMediaDataCenter.start();
+		initP2PClien(remoteFragment);
+//		mMediaDataCenter.start();
 		Log.d(tag, "VideoActivity: onResume============finished!");
 	};
 
 	@Override
 	protected void onPause() {
 		super.onPause();
-		releaseMediaRecorder();
-		stopDecode();
+//		stopDecode();
 		p2pClient.uninit();
-		mMediaDataCenter.stop();
-		
+//		mMediaDataCenter.stop();
 	};
-
 
 	@Override
 	public void onBackPressed() {
@@ -216,19 +203,12 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 		// onDestroy();
 	}
 
-	@Override
-	public boolean onCreateOptionsMenu(Menu menu) {
-		// Inflate the menu; this adds items to the action bar if it is present.
-		getMenuInflater().inflate(R.menu.video, menu);
-		return true;
-	}
 
 	public void onEndClickEvent(View view) {
 		Log.i(tag, "onEndClickEvent>>>from peerId=======" + currentPeerId);
 		(new Thread() {
 			public void run() {
 				p2pClient.stopVideoChat(remotePeerId);
-				releaseMediaRecorder();
 			}
 		}).start();
 	}
@@ -249,38 +229,16 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 	
 	}
 	
-	public void onTextClickEvent(View view) {
-		
-		Log.i(tag, "onTextClickEvent>>>from peerId=======" + currentPeerId);
-		Log.i(tag, "onTextClickEvent>>>..to peerId======" + remotePeerId);
 
-	 	Intent intent = new Intent();
-        intent.putExtra("friendUserId",friendUserId);   
-        intent.putExtra("friendNickname",friendNickname);  
-        intent.putExtra("friendPeerIds", friendPeerIds);
-        /* 指定intent要启动的类 */
-        intent.setClass(VideoActivity.this, TextActivity.class);
-        /* 启动一个新的Activity */
-        startActivity(intent);
-        /* 关闭当前的Activity */
-        //finish();
-		Log.i(tag, "applyAlertDialogBuilder.show()====");
-		Log.i(tag, "onTextClickEvent====");
-		
-	}
 
-	public void onApplyClickEvent(View view) {
+	private void requestChat() {
 		
-		Log.i(tag, "onApplyClickEvent>>>from peerId=======" + currentPeerId);
-		Log.i(tag, "onApplyClickEvent>>>..to peerId======" + remotePeerId);
 		p2pClient.requestVideoChat(remotePeerId);
 
 		AlertDialog.Builder applyAlertDialogBuilder = new AlertDialog.Builder(VideoActivity.this);
 		applyAlertDialog = applyAlertDialogBuilder.setTitle("Video Chatting Request").setIcon(android.R.drawable.ic_dialog_info)
 				.setMessage("waiting for your friend to accept it ...").create();
 		applyAlertDialog.show();
-		Log.i(tag, "applyAlertDialogBuilder.show()====");
-		Log.i(tag, "onApplyClickEvent====");
 		
 	}
 	
@@ -335,7 +293,6 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 
     				} else if(msgCode.equals(Global.MSG_TYPE_VIDEO_CHATTING_REQUEST_END)){
     					Log.i(tag, "msgCode  MSG_TYPE_VIDEO_CHATTING_REQUEST_END===="+msgCode);
-    					releaseMediaRecorder();
     				}
 
     			}
@@ -344,108 +301,92 @@ public class VideoActivity extends Activity implements View.OnClickListener{
     	};
     };
 
-	private static void releaseMediaRecorder() {
-	}
 
 	//for test
-	private H264Decoder h264Decoder;
-	private boolean H264DecoderStarted = false;
-	
-	private AACDecoder aacDecoder;
-	private boolean aacDcoderStarted = false;
-	
-	private void initDecoders() {
-		h264Decoder = new H264Decoder(CameraUtils.previewSize_width, CameraUtils.previewSize_Height, 15);
-		aacDecoder = new AACDecoder();
-		mMediaDataCenter = MediaDataCenter.getInstance(new MediaDataCenter.DataDecodeListener() {
-			
-			@Override
-			public void onVideoDataDecoding(byte[] data, long timestampUs) {
-				try{
-					h264Decoder.decode(data, timestampUs);
-				}catch(Exception e) {
-					e.printStackTrace();
-					h264Decoder.releaseDecoder();
-				}
-			}
-			
-			@Override
-			public void onAudioDataDecoding(byte[] data, long timestampUs) {
-				try{
-					aacDecoder.decode(data, timestampUs);
-				}catch(Exception e) {
-					e.printStackTrace();
-					aacDecoder.reset();
-				}
-				
-			}
-		});
-	}
-	private void startH264Decoder() {
-		if(!H264DecoderStarted) {
-			h264Decoder.setupDecoder(new Surface(mPlaybackView.getSurfaceTexture()));
-			h264Decoder.startDecoder();
-		}
-		H264DecoderStarted = true;
-	}
-	private void stopH264Decoder() {
-		if(h264Decoder != null) {
-			h264Decoder.stopDecoder();
-			h264Decoder.releaseDecoder();
-			h264Decoder = null;
-		}
-		H264DecoderStarted = false;
-	}
-	private void startAACDecoder() {	
-		if(!aacDcoderStarted) {
-			aacDecoder.start();
-		}
-		aacDcoderStarted = true;
-	}
-	private void stopAACDecoder() {
-		if(aacDecoder != null) {
-			aacDecoder.stop();
-			aacDecoder = null;
-		}
-		aacDcoderStarted = false;
-	}
-	private void stopDecode(){
-		stopH264Decoder();
-		stopAACDecoder();
-	}
-	private DateReceivedListener dateReceivedListener = new DateReceivedListener() {
-		
-		@Override
-		public void onH264DataReceived(byte[] arg0, int offset, int length, double timestamp) {
-//			if(!H264DecoderStarted) {
-//				startH264Decoder(new Surface(mPlaybackView.getSurfaceTexture()));
+//	private H264Decoder h264Decoder;
+//	private boolean H264DecoderStarted = false;
+//	
+//	private AACDecoder aacDecoder;
+//	private boolean aacDcoderStarted = false;
+//	
+//	private void initDecoders() {
+//		h264Decoder = new H264Decoder(CameraUtils.previewSize_width, CameraUtils.previewSize_Height, 15);
+//		aacDecoder = new AACDecoder();
+//		mMediaDataCenter = MediaDataCenter.getInstance(new MediaDataCenter.DataDecodeListener() {
+//			
+//			@Override
+//			public void onVideoDataDecoding(byte[] data, long timestampUs) {
+//				try{
+//					h264Decoder.decode(data, timestampUs);
+//				}catch(Exception e) {
+//					e.printStackTrace();
+//					h264Decoder.releaseDecoder();
+//				}
+//			}
+//			
+//			@Override
+//			public void onAudioDataDecoding(byte[] data, long timestampUs) {
+//				try{
+//					aacDecoder.decode(data, timestampUs);
+//				}catch(Exception e) {
+//					e.printStackTrace();
+//					aacDecoder.reset();
+//				}
 //				
 //			}
-//			h264Decoder.onFrame(arg0, 0, length, timestamp);
-			mMediaDataCenter.addVideoFrame(new MediaDataCenter.VideoFrameItem(arg0, 0, length, timestamp));
-		}
-		@Override
-		public void onAACDataReceived(byte[] arg0, int offset, int length, double timestamp) {
-			if(!aacDcoderStarted) {
-				startAACDecoder();
-			}
-//			aacDecoder.onFrame(arg0, offset, length, timestamp);
-			mMediaDataCenter.addAudioData(new MediaDataCenter.AudioStreamData(arg0, offset, length, timestamp));
-		}
-		
-		@Override
-		public void onStringMsgReceived(String remoteGPID, String msg) {
-			System.out.println("..cxd, onStringMsgReceived remoteGPID="+remoteGPID+", msg:"+remoteGPID);
-			
-		}
-	};
-	
-//	private void startChat() {
-//		startH264Decoder();
-//		startAACDecoder();
+//		});
 //	}
-	
-
-	
+//	private void startH264Decoder() {
+//		if(!H264DecoderStarted) {
+//			h264Decoder.setupDecoder(new Surface(mPlaybackView.getSurfaceTexture()));
+//			h264Decoder.startDecoder();
+//		}
+//		H264DecoderStarted = true;
+//	}
+//	private void stopH264Decoder() {
+//		if(h264Decoder != null) {
+//			h264Decoder.stopDecoder();
+//			h264Decoder.releaseDecoder();
+//			h264Decoder = null;
+//		}
+//		H264DecoderStarted = false;
+//	}
+//	private void startAACDecoder() {	
+//		if(!aacDcoderStarted) {
+//			aacDecoder.start();
+//		}
+//		aacDcoderStarted = true;
+//	}
+//	private void stopAACDecoder() {
+//		if(aacDecoder != null) {
+//			aacDecoder.stop();
+//			aacDecoder = null;
+//		}
+//		aacDcoderStarted = false;
+//	}
+//	private void stopDecode(){
+//		stopH264Decoder();
+//		stopAACDecoder();
+//	}
+//	private DateReceivedListener dateReceivedListener = new DateReceivedListener() {
+//		
+//		@Override
+//		public void onH264DataReceived(byte[] arg0, int offset, int length, double timestamp) {
+//			mMediaDataCenter.addVideoFrame(new MediaDataCenter.VideoFrameItem(arg0, 0, length, timestamp));
+//		}
+//		@Override
+//		public void onAACDataReceived(byte[] arg0, int offset, int length, double timestamp) {
+//			if(!aacDcoderStarted) {
+//				startAACDecoder();
+//			}
+//			mMediaDataCenter.addAudioData(new MediaDataCenter.AudioStreamData(arg0, offset, length, timestamp));
+//		}
+//		
+//		@Override
+//		public void onStringMsgReceived(String remoteGPID, String msg) {
+//			System.out.println("..cxd, onStringMsgReceived remoteGPID="+remoteGPID+", msg:"+remoteGPID);
+//			
+//		}
+//	};
 
 }

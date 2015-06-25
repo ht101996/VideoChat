@@ -183,10 +183,10 @@ public class FriendListActivity extends Activity {
 		        	peerIdsListItem.add(peerIdResponse.szPeerId);
 				}
 		        intent.putExtra("friendPeerIds", peerIdsListItem);
-		        /* 指定intent要启动的类 */
-		        if(android.os.Build.VERSION.SDK_INT > 20)
-		        	intent.setClass(FriendListActivity.this, VideoActivity.class);
-		        else
+//		        /* 指定intent要启动的类 */
+//		        if(android.os.Build.VERSION.SDK_INT > 20)
+//		        	intent.setClass(FriendListActivity.this, VideoActivity.class);
+//		        else
 		        	intent.setClass(FriendListActivity.this, VideoChatActivity.class);
 		        /* 启动一个新的Activity */
 		        startActivity(intent);

@@ -311,14 +311,7 @@ void AVBaseRTPSession::OnRTCPCompoundPacket(RTCPCompoundPacket *pack,const RTPTi
 
                       LOGD("Got SR  NTP timestamp: GetMSW = %d  , GetLSW = %d\n", p->GetNTPTimestamp().GetMSW(), p->GetNTPTimestamp().GetLSW());
                       LOGD("Got SR  RTP timestamp: %d, Packet count:%d, Octet count:%d\n",  p->GetRTPTimestamp(), p->GetSenderPacketCount(), p->GetSenderOctetCount());
-                      /*
-                      std::cout << "    SR Info:" << std::endl;
-                      std::cout << "        NTP timestamp:    " << p->GetNTPTimestamp().GetMSW() << ":" << p->GetNTPTimestamp().GetLSW() << std::endl;
-                      std::cout << "        RTP timestamp:    " << p->GetRTPTimestamp() << std::endl;
-                      std::cout << "        Packet count:     " <<  p->GetSenderPacketCount() << std::endl;
-                      std::cout << "        Octet count:      " << p->GetSenderOctetCount() << std::endl;
-                      // std::cout << "        Receive time:     " << p->GetReceiveTime().GetSeconds() << std::endl;
-                      */
+
                   }
                   break;
 

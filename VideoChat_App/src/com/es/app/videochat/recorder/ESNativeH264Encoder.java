@@ -209,7 +209,8 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 //			}
 //			encodeThread = null;
 //		}
-		mediaCodec.stop();  
+		if(mediaCodec != null)
+			mediaCodec.stop();  
        
 	}
 	

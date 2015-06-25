@@ -3,7 +3,9 @@
  会做时间戳验证
 SR是SenderReport， 是发送方发给接收方的。 所以是接收方收到。 RR相反
 
-
+发送方和接收方数据流的对应关系：
+发送方通过SetPortbase(AUDIO_PORT/VIDEO_PORT)接口来区分，现只支持这两个；
+接收方通过函数RTPInit(pRtpCb, videoTransmitter, audioTransmitter)里后两个参数的顺序来识别，第一个接收VIDEO_PORT发送的数据，第二个接收AUDIO_PORT发送的收据；
 
 
 
@@ -16,6 +18,10 @@ client unknit crash
 
 RR出现一样的记录的bug
 
-断网的提示函数
-setOnlineStatus(userId
 
+06.24
+1.断网的提示函数OnTimeout超时时间改短
+2.其它情况数据没有收到的回调函数。
+3.接收端session与数据流的关系
+4.uninit crash
+5.双向数据后报文包只收到一半

@@ -24,6 +24,7 @@ public class MediaDataCenter{
 	private boolean audioThreadStop = true;
 	private boolean synVideoWithAudio = true;
 	private long audioPTS;
+	private VideoDecodeThread videoDecoderThread;
 	public static MediaDataCenter getInstance(DataDecodeListener decodeListener) {
 		if(mInstance == null)
 			mInstance = new MediaDataCenter(decodeListener);
@@ -54,8 +55,9 @@ public class MediaDataCenter{
 	public void start() {
 		videoThreadStop = false;
 		audioThreadStop = false;
+		videoDecoderThread = new VideoDecodeThread("VideoDecodeThread");
+		videoDecoderThread.start();
 		new AudioDecodeThread().start();
-		new VideoDecodeThread().start();
 	}
 	
 	public void stop() {
@@ -65,6 +67,7 @@ public class MediaDataCenter{
 	
 	public void addVideoFrame(VideoFrameItem item) {
 		VideoFrameItemQueue.add(item);
+		
 	}
 	public void addAudioData(AudioStreamData data) {
 		AudioStreamDataQueue.add(data);
@@ -86,44 +89,53 @@ public class MediaDataCenter{
 	}
 	
 	private class VideoDecodeThread extends Thread {
+		public VideoDecodeThread(String name) {
+			super(name);
+		}
 		@Override
 		public void run() {
 			while(!videoThreadStop) {
 				boolean  videoEmpty = VideoFrameItemQueue.isEmpty();
-				if(! videoEmpty) {
-					if(synVideoWithAudio) {
-						VideoFrameItem videoFrame = VideoFrameItemQueue.peek();
-						long videoPTS = (long)videoFrame.getTimestamp() * 1000000; 
-						long VAInterval = videoPTS - audioPTS;
-						if(VAInterval > 500000){
-							try{
-								Thread.sleep(50);
-							}catch(InterruptedException e){
-								e.printStackTrace();
-							}
-							
-							Log.d(Tag, "VAInterval > 500000, Video="+videoPTS+"   audio="+audioPTS);
+				if(videoEmpty) {
+					try{
+						Thread.sleep(50);
+					}catch(InterruptedException e){
+						e.printStackTrace();
+					}
+					continue;
+				}
+				if(synVideoWithAudio) {
+					VideoFrameItem videoFrame = VideoFrameItemQueue.peek();
+					long videoPTS = (long)videoFrame.getTimestamp() * 1000000; 
+					long VAInterval = videoPTS - audioPTS;
+					if(VAInterval > 500000){
+						try{
+							Thread.sleep(50);
+						}catch(InterruptedException e){
+							e.printStackTrace();
 						}
-						else if(VAInterval < -500000) {
-							VideoFrameItemQueue.poll();
-							Log.d(Tag, "~~VAInterval < -500000, Video="+videoPTS+"   audio="+audioPTS);
-						}
-						else {
-							Log.d(Tag, "500000 > VAInterval > -500000");
-							videoFrame = VideoFrameItemQueue.poll();
-							videoPTS = (long)videoFrame.getTimestamp() * 1000000; 
-							if(decodeListener != null)
-								decodeListener.onVideoDataDecoding(videoFrame.getData(), videoPTS);
-						}
+						
+						Log.d(Tag, "VAInterval > 500000, Video="+videoPTS+"   audio="+audioPTS);
+					}
+					else if(VAInterval < -500000) {
+						VideoFrameItemQueue.poll();
+						Log.d(Tag, "~~VAInterval < -500000, Video="+videoPTS+"   audio="+audioPTS);
 					}
 					else {
-						VideoFrameItem videoFrame = VideoFrameItemQueue.poll();
-						long videoPTS = (long)videoFrame.getTimestamp() * 1000000; 
+						Log.d(Tag, "500000 > VAInterval > -500000");
+						videoFrame = VideoFrameItemQueue.poll();
+						videoPTS = (long)videoFrame.getTimestamp() * 1000000; 
 						if(decodeListener != null)
 							decodeListener.onVideoDataDecoding(videoFrame.getData(), videoPTS);
 					}
 				}
-				
+				else {
+					VideoFrameItem videoFrame = VideoFrameItemQueue.poll();
+					long videoPTS = (long)videoFrame.getTimestamp() * 1000000; 
+					if(decodeListener != null)
+						decodeListener.onVideoDataDecoding(videoFrame.getData(), videoPTS);
+				}
+			
 			}
 		}
 	}

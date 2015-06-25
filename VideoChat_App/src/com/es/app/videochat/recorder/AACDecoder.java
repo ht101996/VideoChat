@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.LinkedBlockingQueue;
 
 
+import android.R.integer;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
@@ -13,8 +14,8 @@ import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.util.Log;
 
-public class AACDecoder extends AudioDecoderBase implements Runnable{
-	private final String Tag = AACDecoder.class.getSimpleName();
+public class AACDecoder  implements Runnable{
+	private final String tag = AACDecoder.class.getSimpleName();
 	private final String mimeType = "audio/mp4a-latm";
 	private final int Rate = 44100;//8000;//
 	
@@ -104,8 +105,8 @@ public class AACDecoder extends AudioDecoderBase implements Runnable{
         	ByteBuffer[] outputBuffers = audioCodec.getOutputBuffers();
         	ByteBuffer inputBuffer, outputBuffer;
         	byte[] outData;
-            int inputBufferIndex = audioCodec.dequeueInputBuffer(-1);
-            Log.d(Tag,"AACDecoder, mediaCodec input buffer index= " + inputBufferIndex+", input data length:"+data.length);
+            int inputBufferIndex = audioCodec.dequeueInputBuffer(0);
+            Log.d(tag,"AACDecoder, mediaCodec input buffer index= " + inputBufferIndex+", input data length:"+data.length);
             if (inputBufferIndex >= 0)
             {
             	inputBuffer = inputBuffers[inputBufferIndex];
@@ -128,7 +129,9 @@ public class AACDecoder extends AudioDecoderBase implements Runnable{
 
                 outData = new byte[bufferInfo.size];
                 outputBuffer.get(outData);
-                player.write(outData, 0, outData.length);
+                int num = player.write(outData, 0, outData.length);
+                if(num == AudioTrack.ERROR_BAD_VALUE || num == AudioTrack.ERROR_INVALID_OPERATION)
+                	Log.e(tag, "Write data to audio player return error! error code:"+num);
                 audioCodec.releaseOutputBuffer(outputBufferIndex, false);
                 outputBufferIndex = audioCodec.dequeueOutputBuffer(bufferInfo, 0);
 
@@ -313,7 +316,7 @@ public class AACDecoder extends AudioDecoderBase implements Runnable{
 ////		}
 //	}
 
-	@Override
+
 	public void decode(byte[] data, long timestamp) {
 		decodeAndPlay(data, timestamp);		
 	}
