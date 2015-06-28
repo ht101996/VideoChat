@@ -212,21 +212,136 @@ void StrToGpid(BYTE *gpid, const Sint8 *buf) {
 	}
 }
 
-// change the playing state
-jint JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_pausePlaying
-(JNIEnv * env, jobject clazz)
-{
-	bool isPlaying = false;
-	if (audioSession) {
-//		audioSession->GetAudioRTPSession()->switchPlayingStatus();
-//		isPlaying = audioSession->GetAudioRTPSession()->isPlaying();
+
+static void SendH264Data(unsigned char *pSendbuf, int length, const char* szPktType, jlong timestamp) {
+	LOGI("sendH264Data   start !! szPktType=%s data length : %d, timestamp :%lld",
+			szPktType, length,  timestamp);
+	char sendbuf[MAX_RTP_PKT_LENGTH] = {0};
+
+	int pos = 0, packetSize = 0, srcPos = 0, desPos = 0;
+
+
+	double curtime = (double)timestamp / 1000000;
+	bool flag = false;
+	if (!strcmp(szPktType, "img")) {
+		++videoSequenceNum;
 	}
-	if (videoSession) {
-//		videoSession->GetVideoRTPSession()->switchPlayingStatus();
-//		isPlaying = videoSession->GetVideoRTPSession()->isPlaying();
-	}
-	return isPlaying;
+
+	do {
+		if((length - srcPos) <= MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH) {
+			packetSize = length - srcPos + RTP_PKT_HEADER_LENGTH;
+			videoSession->SetDefaultMark(true);
+			flag = true;
+		}
+		else {
+			packetSize = MAX_RTP_PKT_LENGTH;
+			videoSession->SetDefaultMark(false);
+			flag = false;
+		}
+		memcpy(sendbuf + desPos, &curtime, sizeof(double));
+		desPos += sizeof(double);
+
+		//add sequence number
+		memcpy(sendbuf + desPos, &videoSequenceNum, sizeof(uint32_t));
+		desPos += sizeof(uint32_t);
+
+		//set H264 data
+		memcpy(sendbuf + desPos, pSendbuf + srcPos, packetSize - RTP_PKT_HEADER_LENGTH);
+		int status =  videoSession->SendPacket((void *) sendbuf, packetSize);
+		srcPos += packetSize - RTP_PKT_HEADER_LENGTH;
+//		LOGD("sendH264Data status: %d, buflen: %d, Mark = %d, Line: %d", status, packetSize, flag, __LINE__);
+
+		memset(sendbuf, 0, sizeof(char) * MAX_RTP_PKT_LENGTH);
+		desPos = 0;
+
+
+	}while(srcPos < length);
 }
+
+int GetJniObjectReferenceForH264(JNIEnv *env, jobject jo, jobject odata, h264_nal_t& h264nal, jbyteArray* outPayload) {
+	/* Get a reference to obj's class */
+	jfieldID fid;
+	jclass cls = env->GetObjectClass(odata);
+	/* Look for the instance field s in cls */
+	jobject jPayload;
+	fid = (env)->GetFieldID(cls, "payload", "[B");
+	if (fid == NULL) {
+		return 0; /* failed to find the field */
+	} else {
+		jPayload = env->GetObjectField(odata, fid);
+		h264nal.p_payload = (uint8_t *) env->GetByteArrayElements((jbyteArray)jPayload, 0);
+		*outPayload = (jbyteArray)jPayload;
+	}
+	fid = (env)->GetFieldID(cls, "refIdc", "I");
+	if (fid == NULL) {
+		return 0; /* failed to find the field */
+	} else {
+		jint jRefIdc = env->GetIntField(odata, fid);
+		h264nal.i_ref_idc = jRefIdc;
+	}
+	fid = (env)->GetFieldID(cls, "type", "I");
+	if (fid == NULL) {
+		return 0; /* failed to find the field */
+	} else {
+		jint jType = env->GetIntField(odata, fid);
+		h264nal.i_type = jType;
+	}
+	fid = (env)->GetFieldID(cls, "payloadLength", "I");
+	if (fid == NULL) {
+		return 0; /* failed to find the field */
+	} else {
+		jint jPayLoadLength = env->GetIntField(odata, fid);
+		h264nal.i_payload = jPayLoadLength;
+	}
+	env->DeleteLocalRef(cls);
+//	LOGI("i_payload: %d" , h264nal.i_payload);
+//	LOGI("i_type: %d" , h264nal.i_type);
+//	LOGI("i_ref_idc: %d" , h264nal.i_ref_idc);
+//	LOGI("p_payload length: %d" , env->GetArrayLength((jbyteArray)jPayload));
+	return 1;
+}
+
+
+//static inline int getFrameLength(uint8_t* pAdts)
+//{
+//	return (int)(pAdts[3] & 0x02) << 11 | (int)(pAdts[3] & 0x01) << 11 | (int)(pAdts[4] & 0xe0) << 3 |
+//		   (int)(pAdts[4] & 0x1e) << 3  | (int)(pAdts[4] & 0x01) << 3  | (int)(pAdts[5] & 0xe0) >> 5;
+//}
+//
+//static inline bool isADTSHeader(uint8_t* data)
+//{
+//	if (data[0] == arrADTS[0] && data[1] == arrADTS[1] && data[2] == arrADTS[2] && data[3] == arrADTS[3]) {
+//		return true;
+//	}
+//	return false;
+//}
+
+
+int GetJniObjectReferenceForAAC(JNIEnv *env, jobject jo, jobject odata, aac_nal_t& aacNal, jbyteArray* outPayload) {
+	/* Get a reference to obj's class */
+	jfieldID fid;
+	jclass cls = env->GetObjectClass(odata);
+	/* Look for the instance field s in cls */
+	jobject jPayload;
+	fid = (env)->GetFieldID(cls, "payload", "[B");
+	if (fid == NULL) {
+		return 0; /* failed to find the field */
+	} else {
+		jPayload = env->GetObjectField(odata, fid);
+		aacNal.p_payload = (uint8_t *) env->GetByteArrayElements((jbyteArray)jPayload, 0);
+		*outPayload = (jbyteArray)jPayload;
+	}
+	fid = (env)->GetFieldID(cls, "payloadLength", "I");
+	if (fid == NULL) {
+		return 0; /* failed to find the field */
+	} else {
+		jint jPayLoadLength = env->GetIntField(odata, fid);
+		aacNal.i_payload = jPayLoadLength;
+	}
+	env->DeleteLocalRef(cls);
+	return 1;
+}
+
 
 //init
 void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_nativeInit
@@ -265,17 +380,19 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_nativeUninit
 	LOGD("Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit mark 1 ");
 	if (videoSession != NULL) {
 		VideoRTPSession* videoSess = videoSession->GetVideoRTPSession();
+		videoSess->Destroy();
 		CORE_SAFEDELETE(videoSess);
-		AudioRTPSession* audioSess = videoSession->GetAudioRTPSession();
-		CORE_SAFEDELETE(audioSess);
+//		AudioRTPSession* audioSess = videoSession->GetAudioRTPSession();
+//		CORE_SAFEDELETE(audioSess);
 		videoSession->Destroy();
 	}
 	LOGD("Java_com_arcsoft_ais_arcvc_jni_P2PClient_uninit mark 2 ");
 	if (audioSession != NULL) {
 		if (NULL == videoSession) {
-			VideoRTPSession* videoSess = audioSession->GetVideoRTPSession();
-			CORE_SAFEDELETE(videoSess);
+//			VideoRTPSession* videoSess = audioSession->GetVideoRTPSession();
+//			CORE_SAFEDELETE(videoSess);
 			AudioRTPSession* audioSess = audioSession->GetAudioRTPSession();
+			audioSess->Destroy();
 			CORE_SAFEDELETE(audioSess);
 		}
 		audioSession->Destroy();
@@ -388,7 +505,7 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_startRTPSession
 		status = videoSession->Create(*sessparams, transparams, RTPTransmitter::NATTVLProto);
 		LOGI("startRTPSession videoSession send.Create status: %d, LocalSSRC:%d", status, videoSession->GetLocalSSRC());
 		videoSession->SetVideoRTPSession(videoSess);
-		videoSession->SetAudioRTPSession(audioSess);
+//		videoSession->SetAudioRTPSession(audioSess);
 
 		status = videoSession->AddDestination(addr2);
 //		LOGI("videoSession sess.AddDestination status: %d", status);
@@ -417,7 +534,7 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_startRTPSession
 		audioSession = new AVBaseRTPSession(RTP_AUDIO_PAYLOAD_TYPE);
 		status = audioSession->Create(*audioSessParams, audioTransParams, RTPTransmitter::NATTVLProto);
 		LOGI("startRTPSession audioSession send.Create status: %d, localSSRC:%d", status, audioSession->GetLocalSSRC());
-		audioSession->SetVideoRTPSession(videoSess);
+//		audioSession->SetVideoRTPSession(videoSess);
 		audioSession->SetAudioRTPSession(audioSess);
 
 		status = audioSession->AddDestination(addr2);
@@ -430,8 +547,8 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_startRTPSession
 
 //		LOGI("audioSession startRTPSession Done.");
 
-		audioSess->SetVideoRTPSession(videoSess);
-		videoSess->SetAudioRTPSession(audioSess);
+//		audioSess->SetVideoRTPSession(videoSess);
+//		videoSess->SetAudioRTPSession(audioSess);
 #endif
 
 		RTPTransmitter* videoTransmitter = NULL;
@@ -449,188 +566,6 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_startRTPSession
 	 }
 }
 
-void SendH264Nalu2(h264_nal_t* nalHdr, RTPSession& sess, const char* szPktType, jlong timestamp) {
-	LOGI("SendH264Nalu   start !! szPktType=%s data length : %d", szPktType, nalHdr->i_payload );
-	unsigned char *pSendbuf = nalHdr->p_payload; //发送数据指针
-	int buflen = nalHdr->i_payload;
-
-	char sendbuf[MAX_RTP_PKT_LENGTH] = {0};
-
-	int pos = 0;
-	memcpy(sendbuf, &nalHdr->i_ref_idc, sizeof(int));
-	pos += sizeof(int);
-	memcpy(sendbuf + pos, &nalHdr->i_type, sizeof(int));
-	pos += sizeof(int);
-
-//	struct  timeval    stCurTime;
-//	gettimeofday( &stCurTime, NULL );
-//	double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
-	double curtime = (double)timestamp / 1000000;
-
-	if (!strcmp(szPktType, "img")) {
-		++videoSequenceNum;
-//		FILE* flog = fopen("/mnt/sdcard/videoSend.log", "a");
-//		if (flog) {
-//			fprintf(flog, "SendH264Nalu currentTime: %lf, SequenceNumber: %u\n", curtime, videoSequenceNum);
-//			fclose(flog);
-//		}
-	}
-
-	int status;
-//	LOGD("SendH264Nalu ! ");
-	if (buflen <= MAX_RTP_PKT_LENGTH - pos - RTP_PKT_HEADER_LENGTH) { // 一包就能搞定
-		sess.SetDefaultMark(true); // 因为是最后一包，所以true
-
-		memcpy(sendbuf + pos, &curtime, sizeof(double));
-		pos += sizeof(double);
-		memcpy(sendbuf + pos, &videoSequenceNum, sizeof(uint32_t));
-		pos += sizeof(uint32_t);
-
-		memcpy(sendbuf + pos, pSendbuf, buflen);
-		status = sess.SendPacket((void *) sendbuf, buflen + pos);
-		LOGD("SendH264Nalu Mark=true, szPktType: %s, curtime: %lf, videoSequenceNum:%d, length=%d", szPktType, curtime, videoSequenceNum, buflen);
-	} else if (buflen > MAX_RTP_PKT_LENGTH - pos - RTP_PKT_HEADER_LENGTH) { // 分多包发送
-		//设置标志位Mark为0
-		sess.SetDefaultMark(false);
-
-		//send first RTP pkg
-		memcpy(sendbuf + pos, &curtime, sizeof(double));
-		pos += sizeof(double);
-		memcpy(sendbuf + pos, &videoSequenceNum, sizeof(uint32_t));
-		pos += sizeof(uint32_t);
-
-		memcpy(sendbuf + pos, pSendbuf, MAX_RTP_PKT_LENGTH - pos);
-		status = sess.SendPacket((void *) sendbuf, MAX_RTP_PKT_LENGTH);
-		LOGD("SendH264Nalu Mark=false, szPktType: %s  curtime: %lf, videoSequenceNum=%d  ---", szPktType, curtime, videoSequenceNum);
-
-		int restBufLen = buflen - (MAX_RTP_PKT_LENGTH - pos);
-		pSendbuf += (MAX_RTP_PKT_LENGTH - pos);
-
-		int k = 0, l = 0;
-		k = restBufLen / (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH); // 要分几个完整包
-		l = restBufLen % (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH); // 最后剩余的字节不足一个包
-
-		for (int i = 0; i < k; i++) {
-			if(i == (k-1) && l == 0) { // 因为是最后一包，所以true
-				sess.SetDefaultMark(true);
-			}
-			pos = 0;
-			memcpy(sendbuf + pos, &curtime, sizeof(double));
-			pos += sizeof(double);
-			memcpy(sendbuf + pos, &videoSequenceNum, sizeof(uint32_t));
-			pos += sizeof(uint32_t);
-
-			memcpy(sendbuf + pos, pSendbuf, MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
-			status = sess.SendPacket((void *) sendbuf, MAX_RTP_PKT_LENGTH);
-			pSendbuf += (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
-		}
-
-		if (l > 0) {
-			pos = 0;
-			memcpy(sendbuf + pos, &curtime, sizeof(double));
-			pos += sizeof(double);
-			memcpy(sendbuf + pos, &videoSequenceNum, sizeof(uint32_t));
-			pos += sizeof(uint32_t);
-
-			sess.SetDefaultMark(true); // 因为是最后一包，所以true
-			memcpy(sendbuf + pos, pSendbuf, l);
-			status = sess.SendPacket((void *) sendbuf, l + pos);
-		}
-	} else {
-		LOGI("I'm not ready for video, sorry!!!buflen: %d\n", buflen);
-	}
-}
-
-static void SendH264Data(unsigned char *pSendbuf, int length, const char* szPktType, jlong timestamp) {
-	LOGI("sendH264Data   start !! szPktType=%s data length : %d, timestamp :%lld",
-			szPktType, length,  timestamp);
-//	unsigned char *pSendbuf = nalHdr->p_payload; //发送数据指针
-//	int length = nalHdr->i_payload;
-	char sendbuf[MAX_RTP_PKT_LENGTH] = {0};
-
-	int pos = 0, packetSize = 0, srcPos = 0, desPos = 0;
-
-
-	double curtime = (double)timestamp / 1000000;
-	bool flag = false;
-	if (!strcmp(szPktType, "img")) {
-		++videoSequenceNum;
-	}
-
-	do {
-		if((length - srcPos) <= MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH) {
-			packetSize = length - srcPos + RTP_PKT_HEADER_LENGTH;
-			videoSession->SetDefaultMark(true);
-			flag = true;
-		}
-		else {
-			packetSize = MAX_RTP_PKT_LENGTH;
-			videoSession->SetDefaultMark(false);
-			flag = false;
-		}
-		memcpy(sendbuf + desPos, &curtime, sizeof(double));
-		desPos += sizeof(double);
-
-		//add sequence number
-		memcpy(sendbuf + desPos, &videoSequenceNum, sizeof(uint32_t));
-		desPos += sizeof(uint32_t);
-
-		//set H264 data
-		memcpy(sendbuf + desPos, pSendbuf + srcPos, packetSize - RTP_PKT_HEADER_LENGTH);
-		int status =  videoSession->SendPacket((void *) sendbuf, packetSize);
-		srcPos += packetSize - RTP_PKT_HEADER_LENGTH;
-		LOGD("sendH264Data status: %d, buflen: %d, Mark = %d, Line: %d", status, packetSize, flag, __LINE__);
-
-		memset(sendbuf, 0, sizeof(char) * MAX_RTP_PKT_LENGTH);
-		desPos = 0;
-
-
-	}while(srcPos < length);
-}
-
-int GetJniObjectReferenceForH264(JNIEnv *env, jobject jo, jobject odata, h264_nal_t& h264nal, jbyteArray* outPayload) {
-	/* Get a reference to obj's class */
-	jfieldID fid;
-	jclass cls = env->GetObjectClass(odata);
-	/* Look for the instance field s in cls */
-	jobject jPayload;
-	fid = (env)->GetFieldID(cls, "payload", "[B");
-	if (fid == NULL) {
-		return 0; /* failed to find the field */
-	} else {
-		jPayload = env->GetObjectField(odata, fid);
-		h264nal.p_payload = (uint8_t *) env->GetByteArrayElements((jbyteArray)jPayload, 0);
-		*outPayload = (jbyteArray)jPayload;
-	}
-	fid = (env)->GetFieldID(cls, "refIdc", "I");
-	if (fid == NULL) {
-		return 0; /* failed to find the field */
-	} else {
-		jint jRefIdc = env->GetIntField(odata, fid);
-		h264nal.i_ref_idc = jRefIdc;
-	}
-	fid = (env)->GetFieldID(cls, "type", "I");
-	if (fid == NULL) {
-		return 0; /* failed to find the field */
-	} else {
-		jint jType = env->GetIntField(odata, fid);
-		h264nal.i_type = jType;
-	}
-	fid = (env)->GetFieldID(cls, "payloadLength", "I");
-	if (fid == NULL) {
-		return 0; /* failed to find the field */
-	} else {
-		jint jPayLoadLength = env->GetIntField(odata, fid);
-		h264nal.i_payload = jPayLoadLength;
-	}
-	env->DeleteLocalRef(cls);
-//	LOGI("i_payload: %d" , h264nal.i_payload);
-//	LOGI("i_type: %d" , h264nal.i_type);
-//	LOGI("i_ref_idc: %d" , h264nal.i_ref_idc);
-//	LOGI("p_payload length: %d" , env->GetArrayLength((jbyteArray)jPayload));
-	return 1;
-}
-
 void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_send264Packet
   (JNIEnv * env, jobject clazz, jstring jstring, jobject nal, jlong timestamp)
 {
@@ -640,269 +575,15 @@ void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_send264Packet
 	const char *szPktType = (const char *)env->GetStringUTFChars(jstring, 0);
 	SendH264Data(h264nal.p_payload, h264nal.i_payload, szPktType, timestamp);
 	env->ReleaseStringUTFChars(jstring, szPktType);
-	LOGD("destination gpid: %s, send264Packet, __LINE__: %d\n" , g_destGPID, __LINE__);
 	env->ReleaseByteArrayElements(jpayload, (jbyte*)h264nal.p_payload, 0);
 	env->DeleteLocalRef(jpayload);
 }
 
-static inline int getFrameLength(uint8_t* pAdts)
-{
-	return (int)(pAdts[3] & 0x02) << 11 | (int)(pAdts[3] & 0x01) << 11 | (int)(pAdts[4] & 0xe0) << 3 |
-		   (int)(pAdts[4] & 0x1e) << 3  | (int)(pAdts[4] & 0x01) << 3  | (int)(pAdts[5] & 0xe0) >> 5;
-}
 
-static inline bool isADTSHeader(uint8_t* data)
-{
-	if (data[0] == arrADTS[0] && data[1] == arrADTS[1] && data[2] == arrADTS[2] && data[3] == arrADTS[3]) {
-		return true;
-	}
-	return false;
-}
-
-static inline int getNextAACFrameOffset(uint8_t* data, int len)
-{
-	int ret = -1;
-	int off = 0;
-
-	while (len >= ADTS_HEADER_LENGTH) {
-		if (isADTSHeader(data + off)) {
-			ret = off;
-			break;
-		}
-		++off;
-		--len;
-	}
-	return ret;
-}
-
-//static int outputIndex = 0;
-//static int outputOrgIndex = 0;
-//void SendAACNalu(aac_nal_t* nalHdr, RTPSession& sess) {
-//	LOGI("SendAACNalu...start");
-//
-//	uint8_t* pSendbuf = nalHdr->p_payload; //发送数据指针
-//	int buflen = 0;
-//	char sendbuf[MAX_RTP_PKT_LENGTH] = {0};
-//	int status;
-//
-//	while (nalHdr->i_payload > 0) {
-//		LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-//
-//		if(0){
-//							char desPath[256] = { 0 };
-//							sprintf(desPath, "/sdcard/chatdump/audioOutOrg_%d.txt",
-//									outputOrgIndex);
-//							FILE *fp = fopen(desPath, "wb"); //wb 以二进制流写
-//							if (fp) {
-//								fwrite(nalHdr->p_payload, 1, nalHdr->i_payload, fp);
-//								fclose(fp);
-//								LOGD("cxd put %s", desPath);
-//							}
-//							outputOrgIndex ++;
-//					}
-//		buflen = getNextAACFrameOffset(nalHdr->p_payload, nalHdr->i_payload);
-//		if (!buflen) {
-//			LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-//			int framelength = getFrameLength(nalHdr->p_payload);
-//			buflen = nalHdr->i_payload >= framelength ? framelength : nalHdr->i_payload;
-//		} else if (buflen < 0) {
-//			LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-//			buflen = nalHdr->i_payload;
-//		}
-//
-//		pSendbuf = nalHdr->p_payload;
-//		nalHdr->p_payload += buflen;
-//		nalHdr->i_payload -= buflen;
-//
-//		if (stAACFrameBuf.buflen + buflen + 2 > MAX_AAC_FRAME_SIZE) {
-//			LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-//			memcpy(stAACFrameBuf.pBuf, stAACFrameBuf.pBuf + stAACFrameBuf.buflen - sizeof(arrADTS), sizeof(arrADTS));
-//			stAACFrameBuf.buflen = sizeof(arrADTS);
-//		}
-//
-//		/* put aac data into buffer */
-//		memcpy(stAACFrameBuf.pBuf + stAACFrameBuf.buflen, pSendbuf, buflen);
-//		stAACFrameBuf.buflen += buflen;
-//		stAACFrameBuf.pBuf[stAACFrameBuf.buflen] = stAACFrameBuf.pBuf[stAACFrameBuf.buflen + 1] = 0;
-//
-//		/* get the first four bytes of adts header of the current aac stream */
-//		if (!arrADTS[0] && stAACFrameBuf.buflen > sizeof(arrADTS)) {
-//			memcpy(arrADTS, stAACFrameBuf.pBuf, sizeof(arrADTS));
-//		}
-//
-//		while ((buflen = getNextAACFrameOffset(stAACFrameBuf.pBuf, stAACFrameBuf.buflen)) >= 0) {
-//			if (buflen > 0) {
-//				LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-//				stAACFrameBuf.buflen -= buflen;
-//				memmove(stAACFrameBuf.pBuf, stAACFrameBuf.pBuf + buflen, stAACFrameBuf.buflen);
-//			}
-//
-//			LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-//			stAACFrameBuf.framelength = getFrameLength(stAACFrameBuf.pBuf);
-//			if (stAACFrameBuf.buflen >= stAACFrameBuf.framelength) {
-//				if ((stAACFrameBuf.buflen - stAACFrameBuf.framelength) < ADTS_HEADER_LENGTH || isADTSHeader(stAACFrameBuf.pBuf + stAACFrameBuf.framelength) ||
-//					(stAACFrameBuf.pBuf[stAACFrameBuf.framelength] == 0 && stAACFrameBuf.pBuf[stAACFrameBuf.framelength + 1] == 0)) {
-//					LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-//					pSendbuf = stAACFrameBuf.pBuf;
-//					buflen = stAACFrameBuf.framelength;
-//				} else {
-//					LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-//					buflen = getNextAACFrameOffset(stAACFrameBuf.pBuf + 1, stAACFrameBuf.buflen - 1);
-//					if (buflen > 0) {
-//						buflen += 1;
-//						stAACFrameBuf.buflen -= buflen;
-//					} else {
-//						buflen = stAACFrameBuf.buflen - sizeof(arrADTS);
-//						stAACFrameBuf.buflen = sizeof(arrADTS);
-//					}
-//					memmove(stAACFrameBuf.pBuf, stAACFrameBuf.pBuf + buflen, stAACFrameBuf.buflen);
-//					stAACFrameBuf.framelength = 0;
-//					stAACFrameBuf.pBuf[stAACFrameBuf.buflen] = stAACFrameBuf.pBuf[stAACFrameBuf.buflen + 1] = 0;
-//					continue;
-//				}
-//			} else {
-//				LOGI("buflen: %d, __LINE__: %d\n", buflen, __LINE__);
-//				break;
-//			}
-//
-//			int pos = 0;
-//			struct  timeval    stCurTime;
-//			gettimeofday( &stCurTime, NULL );
-//			double curtime = (double)stCurTime.tv_sec + (double)stCurTime.tv_usec / 1000000;
-//			++audioSequenceNum;
-//
-////			FILE* flog = fopen("/mnt/sdcard/audioSend.log", "a");
-////			if (flog) {
-////				fprintf(flog, "SendAACNalu currentTime:%lf, SequenceNumber: %u\n", curtime, audioSequenceNum);
-////				fclose(flog);
-////			}
-//
-//			if (buflen <= MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH) { // 一包就能搞定
-//				sess.SetDefaultMark(true); // 因为是最后一包，所以true
-//
-//				memcpy(sendbuf + pos, &curtime, sizeof(double));
-//				pos += sizeof(double);
-//				memcpy(sendbuf + pos, &audioSequenceNum, sizeof(uint32_t));
-//				pos += sizeof(uint32_t);
-//				memcpy(sendbuf + pos, pSendbuf, buflen);
-//
-//			if(0){
-//				char desPath[256] = { 0 };
-//					sprintf(desPath, "/sdcard/chatdump/audioOut_%d.txt",
-//							outputIndex);
-//					FILE *fp = fopen(desPath, "wb"); //wb 以二进制流写
-//					if (fp) {
-//						fwrite(pSendbuf, 1, buflen, fp);
-//						fclose(fp);
-//						LOGD("cxd put %s", desPath);
-//					}
-//					outputIndex ++;
-//			}
-//
-//				status = sess.SendPacket((void *) sendbuf, buflen + pos);
-//				LOGD("SendAACNalu status: %d, buflen: %d --------File: %s, Line: %d", status, buflen, __FILE__, __LINE__);
-//			} else if (buflen > MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH) { // 分多包发送
-//				//设置标志位Mark为0
-//				sess.SetDefaultMark(false);
-//
-//				//send first RTP pkg
-//				memcpy(sendbuf + pos, &curtime, sizeof(double));
-//				pos += sizeof(double);
-//				memcpy(sendbuf + pos, &audioSequenceNum, sizeof(uint32_t));
-//				pos += sizeof(uint32_t);
-//
-//				memcpy(sendbuf + pos, pSendbuf, MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
-//				status = sess.SendPacket((void *) sendbuf, MAX_RTP_PKT_LENGTH);
-//				LOGD("SendH264Nalu status: %d, buflen: %d --------File: %s, Line: %d", status, buflen, __FILE__, __LINE__);
-//
-//				int restBufLen = buflen - (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
-//				pSendbuf += (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
-//
-//				int k = 0, l = 0;
-//				k = restBufLen / (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH); // 要分几个完整包
-//				l = restBufLen % (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH); // 最后剩余的字节不足一个包
-//
-//				for (int i = 0; i < k; i++) {
-//					if(i == (k-1) && l == 0) { // 因为是最后一包，所以true
-//						sess.SetDefaultMark(true);
-//					}
-//					pos = 0;
-//					memcpy(sendbuf + pos, &curtime, sizeof(double));
-//					pos += sizeof(double);
-//					memcpy(sendbuf + pos, &audioSequenceNum, sizeof(uint32_t));
-//					pos += sizeof(uint32_t);
-//
-//					memcpy(sendbuf + pos, pSendbuf, MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
-//					status = sess.SendPacket((void *) sendbuf, MAX_RTP_PKT_LENGTH);
-//					pSendbuf += (MAX_RTP_PKT_LENGTH - RTP_PKT_HEADER_LENGTH);
-//				}
-//
-//				if (l > 0) {
-//					pos = 0;
-//					memcpy(sendbuf + pos, &curtime, sizeof(double));
-//					pos += sizeof(double);
-//					memcpy(sendbuf + pos, &audioSequenceNum, sizeof(uint32_t));
-//					pos += sizeof(uint32_t);
-//
-//					sess.SetDefaultMark(true); // 因为是最后一包，所以true
-//					memcpy(sendbuf + pos, pSendbuf, l);
-//					status = sess.SendPacket((void *) sendbuf, l + pos);
-//				}
-//			} else {
-//				LOGI("I'm not ready for audio, sorry!!!buflen: %d\n", buflen);
-//			}
-//
-//			buflen = 0;
-//			stAACFrameBuf.buflen -= stAACFrameBuf.framelength;
-//			memmove(stAACFrameBuf.pBuf, stAACFrameBuf.pBuf + stAACFrameBuf.framelength, stAACFrameBuf.buflen);
-//			stAACFrameBuf.framelength = 0;
-//		}
-//	}
-//
-//	LOGI("SendAACNalu...end");
-//}
-
-int GetJniObjectReferenceForAAC(JNIEnv *env, jobject jo, jobject odata, aac_nal_t& aacNal, jbyteArray* outPayload) {
-	/* Get a reference to obj's class */
-	jfieldID fid;
-	jclass cls = env->GetObjectClass(odata);
-	/* Look for the instance field s in cls */
-	jobject jPayload;
-	fid = (env)->GetFieldID(cls, "payload", "[B");
-	if (fid == NULL) {
-		return 0; /* failed to find the field */
-	} else {
-		jPayload = env->GetObjectField(odata, fid);
-		aacNal.p_payload = (uint8_t *) env->GetByteArrayElements((jbyteArray)jPayload, 0);
-		*outPayload = (jbyteArray)jPayload;
-	}
-	fid = (env)->GetFieldID(cls, "payloadLength", "I");
-	if (fid == NULL) {
-		return 0; /* failed to find the field */
-	} else {
-		jint jPayLoadLength = env->GetIntField(odata, fid);
-		aacNal.i_payload = jPayLoadLength;
-	}
-	env->DeleteLocalRef(cls);
-	return 1;
-}
-
-//void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACPacket
-//  (JNIEnv * env, jobject clazz, jstring jstring, jobject nal)
-//{
-//	aac_nal_t aacNal;
-//	jbyteArray jpayload;
-//	GetJniObjectReferenceForAAC(env, clazz, nal, aacNal, &jpayload);
-//	SendAACNalu(&aacNal, *audioSession);
-//	LOGD("sendAACPacket destination gpid: %s, sendAACPacket, __LINE__: %d\n" , g_destGPID, __LINE__);
-//	env->ReleaseByteArrayElements(jpayload, (jbyte*)aacNal.p_payload, 0);
-//	env->DeleteLocalRef(jpayload);
-//}
 void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendAACESData
   (JNIEnv *env, jobject clazz, jbyteArray data, jint length, jlong timestamp)
 {
-//	LOGD("sendAACESData start, buflen: %d --------, Line: %d", length, __LINE__);
-	LOGD("sendAACESData destination gpid: %s, __LINE__: %d\n" , g_destGPID, __LINE__);
+	LOGD("sendAACESData destination gpid: %s, timestamp: %lld\n" , g_destGPID, timestamp);
 	if(data == NULL || length == 0)
 		return;
 	char sendbuf[MAX_RTP_PKT_LENGTH] = {0};

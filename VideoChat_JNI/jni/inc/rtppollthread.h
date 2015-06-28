@@ -61,13 +61,14 @@ public:
 private:
 	void *Thread();
 	
-	bool stop;
-	POS_FILLER3;
+
 	JMutex stopmutex;
 	RTPTransmitter *transmitter;
 	
 	RTPSession &rtpsession;
 	RTCPScheduler &rtcpsched;
+	bool stop;
+	POS_FILLER3;
 };
 
 #endif // RTP_SUPPORT_THREAD

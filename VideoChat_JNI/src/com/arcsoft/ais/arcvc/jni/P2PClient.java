@@ -92,12 +92,6 @@ public class P2PClient {
 	private native void sendMsg(String gpid, String msg);
 
 	/**
-	 * pausePlaying
-	 * @return isPlaying 1-playing  ;0 - pause
-	 */
-	public native int pausePlaying();
-	
-	/**
 	 * get local gpid from jni
 	 * 
 	 * @return gpid

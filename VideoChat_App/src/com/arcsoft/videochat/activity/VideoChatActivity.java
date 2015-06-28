@@ -1,4 +1,4 @@
-package com.arcsoft.ais.arcvc.activity;
+package com.arcsoft.videochat.activity;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -31,17 +31,17 @@ import android.view.View;
 import android.view.WindowManager;
 
 import com.arcsoft.ais.arcvc.R;
-import com.arcsoft.ais.arcvc.fragment.AudioRecorderFragment;
-import com.arcsoft.ais.arcvc.fragment.CameraFragment;
-import com.arcsoft.ais.arcvc.fragment.RemoteDisplayFragment;
 import com.arcsoft.ais.arcvc.jni.P2PClient;
 import com.arcsoft.ais.arcvc.jni.P2PClient.DateReceivedListener;
 import com.arcsoft.ais.arcvc.utils.CameraUtils;
 import com.arcsoft.ais.arcvc.utils.Configer;
 import com.arcsoft.ais.arcvc.utils.Global;
 import com.arcsoft.ais.arcvc.utils.P2PClientManager;
+import com.arcsoft.videochat.codec.H264Decoder;
+import com.arcsoft.videochat.fragment.AudioRecorderFragment;
+import com.arcsoft.videochat.fragment.CameraFragment;
+import com.arcsoft.videochat.fragment.RemoteDisplayFragment;
 import com.es.app.videochat.recorder.ESRecordListener.OnEncoderListener;
-import com.es.app.videochat.recorder.H264Decoder;
 import com.es.app.videochat.recorder.MediaDataCenter;
 
 public class VideoChatActivity extends Activity implements View.OnClickListener{
@@ -54,9 +54,10 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	private String currentPeerId;
 	private ArrayList<String> friendPeerIds;
 	private List<String> peerIdsOfFriends;
-
 	private P2PClient p2pClient;
+	
 	private long friendUserId;
+	private boolean isFinished = false;
 	
 	/****** views *******/
 	private Dialog applyAlertDialog;
@@ -71,26 +72,26 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_video_chat);
+		//do not change function's order
 		getUserInfo();
+		initConnection();
 		initUI();
 	}
-	
-	
 	
 	@Override
 	protected void onResume() {
 		super.onResume();
-		initP2PClien(remoteFragment);
+//		initP2PClien(remoteFragment);
 	};
 
 	@Override
 	protected void onPause() {
 		super.onPause();
 		stopChat();
-		uninitP2PClient();
+		if(isFinished)
+			stopConnection();
+//		uninitP2PClient();
 	};
-	
-
 	
 	private void getUserInfo() {
 		Intent intent = getIntent();
@@ -108,15 +109,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 			Log.i(tag, "friendPeerIds.get(0)>>>..." + friendPeerIds.get(0));
 		}
 	}
-	private void initP2PClien(DateReceivedListener listener) {
-		p2pClient = P2PClientManager.getP2PClientInstance();
-		p2pClient.startRTPSession(remotePeerId);
-		p2pClient.setDateReceivedListener(listener);
-	}
-	private void uninitP2PClient() {
-		p2pClient.uninit();
-		p2pClient = null;
-	}
+
 	
 	private void initUI() {
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -137,6 +130,11 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		addCameraFragment();
 		addRemoteDisplayFragment();
 		addAudioRecorderFragment();
+	}
+	
+	private void initConnection() {
+		p2pClient = ((VideoChatApplication)getApplication()).getP2PClient();
+		p2pClient.startRTPSession(remotePeerId);
 	}
 	
 	@Override
@@ -171,21 +169,21 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 	}
 	
 	private void addCameraFragment() {
-		cameraFragment = new CameraFragment(CameraUtils.previewSize_width, CameraUtils.previewSize_Height, 15);
+		cameraFragment = new CameraFragment(CameraUtils.previewSize_width, CameraUtils.previewSize_Height, 15, p2pClient);
 		FragmentTransaction ft = getFragmentManager().beginTransaction();
 		ft.add(R.id.camera_fragment, cameraFragment);
 		ft.commit();
 	}
 	
 	private void addRemoteDisplayFragment() {
-		remoteFragment = new RemoteDisplayFragment();
+		remoteFragment = new RemoteDisplayFragment(p2pClient);
 		FragmentTransaction ft = getFragmentManager().beginTransaction();
 		ft.add(R.id.remote_display_fragment, remoteFragment);
 		ft.commit();
 	}
 	
 	private void addAudioRecorderFragment() {
-		audioRecorderFragment = new AudioRecorderFragment();
+		audioRecorderFragment = new AudioRecorderFragment(p2pClient);
 		FragmentTransaction ft = getFragmentManager().beginTransaction();
 		ft.add(audioRecorderFragment, audioRecorderFragmentTag);
 		ft.commit();
@@ -205,11 +203,17 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		if(audioRecorderFragment != null)
 			audioRecorderFragment.stopAudioRecorder();
 	}
+	
+	private void stopConnection() {
+		((VideoChatApplication)getApplication()).uninitP2PClient();
+	}
+	
 
 	@Override
 	public boolean onKeyUp(int keyCode, KeyEvent event) {
 		Log.d(tag, "onKeyUp, keyCode="+keyCode+", event.isTracking():"+event.isTracking()+", event.isCanceled():"+event.isCanceled());
 		if(keyCode == KeyEvent.KEYCODE_BACK) {
+			isFinished = true;
 			finish();
 			return true;
 		}
@@ -217,18 +221,27 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 		return super.onKeyUp(keyCode, event);
 	}
 	
+	@Override
+	protected void onSaveInstanceState(Bundle outState) {
+		super.onSaveInstanceState(outState);
+		if(!isFinished){
+			Log.i(tag, "Stop Connection onSaveInstanceState!");
+			stopConnection();
+		}
+	}
+	
 	//for test
 	private H264Decoder decoder;
 	
 	private void startDecode(Surface surface) {
-		decoder = new H264Decoder(CameraUtils.previewSize_width, CameraUtils.previewSize_Height, 15);
-		decoder.setupDecoder(surface);
+		decoder = new H264Decoder();
+		decoder.setupDecoder(CameraUtils.previewSize_width, CameraUtils.previewSize_Height, surface);
 		decoder.startDecoder();
 	
 		mDataCenter = MediaDataCenter.getInstance(mDataDecodeListener, false);
 		mDataCenter.start();
 		
-		cameraFragment.setEncoderListener(encoderListener);
+//		cameraFragment.setEncoderListener(encoderListener);//TODO 
 	}
 	private OnEncoderListener  encoderListener = new OnEncoderListener() {
 
@@ -252,7 +265,7 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 				decoder.decode(data, timestampUs);
 			}catch(Exception e) {
 				e.printStackTrace();
-				decoder.resetDecoder();
+//				decoder.resetDecoder();
 			}
 		}
 		
@@ -288,13 +301,13 @@ public class VideoChatActivity extends Activity implements View.OnClickListener{
 							.setPositiveButton("Accept", new DialogInterface.OnClickListener() {
 								@Override
 								public void onClick(DialogInterface dialog, int which) {
-									P2PClientManager.getP2PClientInstance().acceptVideoChat(remotePeerId);
+									p2pClient.acceptVideoChat(remotePeerId);
 								}
 							}).setNegativeButton("Reject", new DialogInterface.OnClickListener() {
 								public void onClick(DialogInterface dialog, int which) {
 									Log.i(tag, "p2p sendMsg>>>..from peerId======" + currentPeerId);
 									Log.i(tag, "p2p sendMsg>>>..to peerId======" + remotePeerId);
-									P2PClientManager.getP2PClientInstance().rejectVideoChat(remotePeerId);
+									p2pClient.rejectVideoChat(remotePeerId);
 									Log.i(tag, "Reject====");
 
 									dialog.cancel();// 取消弹出框

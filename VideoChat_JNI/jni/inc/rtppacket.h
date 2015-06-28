@@ -162,9 +162,7 @@ private:
 	bool hasmarker;
 	uint16_t extid;
 
-	uint8_t payloadtype;
-	bool externalbuffer;
-	POS_FILLER2;
+
 
 	uint32_t extseqnr,timestamp,ssrc;
 	uint8_t *packet,*payload;
@@ -177,6 +175,9 @@ private:
 
 
 	RTPTime receivetime;
+	uint8_t payloadtype;
+	bool externalbuffer;
+	POS_FILLER2;
 };
 
 #endif // RTPPACKET_H

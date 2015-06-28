@@ -185,13 +185,14 @@ private:
 	RTPSources &sources;
 	RTPPacketBuilder &rtppacketbuilder;
 	
-	bool init;
-	bool firstpacket;
-	POS_FILLER2;
+
 	size_t maxpacketsize;
 	double timestampunit;
 
 	RTPTime prevbuildtime,transmissiondelay;
+	bool init;
+	bool firstpacket;
+	POS_FILLER2;
 
 	class RTCPSDESInfoInternal : public RTCPSDESInfo
 	{
@@ -215,6 +216,7 @@ private:
 	};
 	
 	RTCPSDESInfoInternal ownsdesinfo;
+	int sdesbuildcount;
 	int interval_name,interval_email,interval_location;
 	int interval_phone,interval_tool,interval_note;
 	bool doname;
@@ -226,7 +228,7 @@ private:
 	bool processingsdes;
 	POS_FILLER1;
 
-	int sdesbuildcount;
+
 };
 
 #endif // RTCPPACKETBUILDER_H

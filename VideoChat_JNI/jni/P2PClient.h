@@ -33,14 +33,6 @@ JNIEXPORT void JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_sendMsg
 
 /*
  * Class:     com_arcsoft_ais_arcvc_jni_P2PClient
- * Method:    pausePlaying
- * Signature: ()I
- */
-JNIEXPORT jint JNICALL Java_com_arcsoft_ais_arcvc_jni_P2PClient_pausePlaying
-  (JNIEnv *, jobject);
-
-/*
- * Class:     com_arcsoft_ais_arcvc_jni_P2PClient
  * Method:    getLocalGpid
  * Signature: ()Ljava/lang/String;
  */

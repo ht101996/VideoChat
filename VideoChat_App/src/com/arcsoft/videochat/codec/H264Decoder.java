@@ -1,4 +1,4 @@
-package com.es.app.videochat.recorder;
+package com.arcsoft.videochat.codec;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -8,31 +8,31 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import com.es.app.videochat.recorder.VideoDecoderBase;
+
 import android.media.MediaCodec;
 import android.media.MediaFormat;
-import android.os.Environment;
-import android.sax.StartElementListener;
 import android.util.Log;
 import android.view.Surface;
 
-public class H264Decoder extends VideoDecoderBase implements Runnable{
+public class H264Decoder {//implements Runnable{
 	private static final String Tag = H264Decoder.class.getSimpleName();
+	private static final String mimeType = "video/avc";
 	private MediaCodec mediaCodec = null;  
 	private MediaFormat mediaFormat = null;
 	private Surface surface = null;
-	private int width, height, frameRate;
+	private int width, height;
+//	private int frameRate;
 //	int mCount = 0;
-	private boolean stopped = true;
-	public H264Decoder(int width, int height, int frameRate) {
-		this.width = width;
-		this.height = height;
-		this.frameRate = frameRate;
-				
+	public H264Decoder() {
+		
 	}
 	
-	public void setupDecoder(Surface surface) {
-		 mediaCodec = MediaCodec.createDecoderByType("video/avc");
-		 mediaFormat = MediaFormat.createVideoFormat("video/avc", width, height);
+	public void setupDecoder(int width, int height, Surface surface) {
+		 this.width = width;
+		 this.height = height;
+		 mediaCodec = MediaCodec.createDecoderByType(mimeType);
+		 mediaFormat = MediaFormat.createVideoFormat(mimeType, width, height);
 		 this.surface = surface;
 //	     new Thread(this).start();
 	}
@@ -40,12 +40,10 @@ public class H264Decoder extends VideoDecoderBase implements Runnable{
 	public void startDecoder() {
 		 mediaCodec.configure(mediaFormat, surface, null, 0);
 	     mediaCodec.start();
-	     stopped = false;
 	}
 	public void stopDecoder() {
 		if(mediaCodec != null)
 			mediaCodec.stop();
-		stopped = true;
 	}
 	
 	public void releaseDecoder() {
@@ -60,8 +58,8 @@ public class H264Decoder extends VideoDecoderBase implements Runnable{
 		startDecoder();
 	}
 	
-	@Override
-	public void run() {
+//	@Override
+//	public void run() {
 //		byte[]  decodeByte = null;
 //		long curTime = System.nanoTime();
 //		while(!stopped) {
@@ -97,7 +95,7 @@ public class H264Decoder extends VideoDecoderBase implements Runnable{
 //				outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
 //			}
 //		}
-	}
+//	}
 	
 	
 //	public void onFrame(byte[] buf, int offset, int length, double timestamp) {
@@ -128,7 +126,6 @@ public class H264Decoder extends VideoDecoderBase implements Runnable{
 //		}
 //	}
 
-	@Override
 	public void decode(byte[] data, long timestamp) {
 		
 		ByteBuffer[] inputBuffers = mediaCodec.getInputBuffers();

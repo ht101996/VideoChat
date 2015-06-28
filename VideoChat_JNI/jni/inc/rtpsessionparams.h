@@ -208,15 +208,16 @@ private:
 	double senderfrac;
 	RTPTime mininterval;
 
-	bool immediatebye;
-	bool SR_BYE;
-	POS_FILLER2;
+
 
 	double sendermultiplier;
 	double generaltimeoutmultiplier;
 	double byetimeoutmultiplier;
 	double collisionmultiplier;
 	double notemultiplier;
+	bool immediatebye;
+	bool SR_BYE;
+	POS_FILLER2;
 };
 
 #endif // RTPSESSIONPARAMS_H

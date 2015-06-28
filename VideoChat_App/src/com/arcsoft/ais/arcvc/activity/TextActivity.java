@@ -34,6 +34,7 @@ import com.arcsoft.ais.arcvc.utils.Configer;
 import com.arcsoft.ais.arcvc.utils.Global;
 import com.arcsoft.ais.arcvc.utils.P2PClientManager;
 import com.arcsoft.coreapi.sdk.CoreVCDef.PeerIdResponse;
+import com.arcsoft.videochat.activity.VideoChatApplication;
 
 public class TextActivity extends Activity implements View.OnClickListener {
 
@@ -91,7 +92,7 @@ public class TextActivity extends Activity implements View.OnClickListener {
 		Log.i(Global.TAG, "remotePeerId>>>..." + remotePeerId);
 		// startRTPSession
 		Log.i(Global.TAG, "P2PClient.startRTPSession() >>>.start..");
-		P2PClientManager.getP2PClientInstance().startRTPSession(remotePeerId);
+		((VideoChatApplication)getApplication()).getP2PClient().startRTPSession(remotePeerId);
 		Log.i(Global.TAG, "P2PClient.startRTPSession() sucessfully");
 
 
@@ -264,7 +265,7 @@ public class TextActivity extends Activity implements View.OnClickListener {
 		if (msg != null && msg.length() > 0) {
 			Log.i(Global.TAG, "p2p sendMsg>>>...msg======" + msg);
 
-			P2PClientManager.getP2PClientInstance().sendTextMsg(remotePeerId, msg);
+			((VideoChatApplication)getApplication()).getP2PClient().sendTextMsg(remotePeerId, msg);
 			// Editable text = editText_receive_msg.getText();
 
 			SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd-HH:mm:ss", Locale.US);

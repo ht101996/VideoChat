@@ -1,4 +1,4 @@
-package com.es.app.videochat.recorder;
+package com.arcsoft.videochat.codec;
 
 
 import java.nio.ByteBuffer;
@@ -14,7 +14,7 @@ import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.util.Log;
 
-public class AACDecoder  implements Runnable{
+public class AACDecoder {
 	private final String tag = AACDecoder.class.getSimpleName();
 	private final String mimeType = "audio/mp4a-latm";
 	private final int Rate = 44100;//8000;//
@@ -34,7 +34,7 @@ public class AACDecoder  implements Runnable{
 	
 	private MediaFormat getMediaFormat() {
 		MediaFormat format = new MediaFormat();
-        format.setString(MediaFormat.KEY_MIME, "audio/mp4a-latm");
+        format.setString(MediaFormat.KEY_MIME, mimeType);
         format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
         format.setInteger(MediaFormat.KEY_SAMPLE_RATE, Rate);
         format.setInteger(MediaFormat.KEY_BIT_RATE, Rate * 16);
@@ -42,20 +42,17 @@ public class AACDecoder  implements Runnable{
         return format;
 	}
 	
-	private boolean usingThread = false;
 	public boolean start() {
 		if(!initDecoder() || !initPlayer())
 			return false;
 		innerStart();
-		if(usingThread) 
-			(new Thread(this)).start();
 		return true;
 	}
 	
 	private boolean initDecoder() {
 		try{
 			format = getMediaFormat();
-			audioCodec = MediaCodec.createDecoderByType("audio/mp4a-latm");
+			audioCodec = MediaCodec.createDecoderByType(mimeType);
 			
 		}catch(Exception e){
 			return false;
@@ -81,19 +78,6 @@ public class AACDecoder  implements Runnable{
 
     }
 	
-	@Override
-	public void run() {
-		try
-        {
-            while (!bStop) {
-//            	decodeAndPlay(inputByteQueue.poll());
-            }
-        }
-        catch (Exception e)
-        {
-        	e.printStackTrace();
-        }
-	}
 	private void decodeAndPlay(byte[] data, long presentationTimeUs) {
 		try
         {
@@ -279,7 +263,7 @@ public class AACDecoder  implements Runnable{
 	
 	public void reset() {
 		stop();
-		innerStart();
+		start();
 	}
 	
 //	private LinkedBlockingQueue<byte[]> inputByteQueue = new LinkedBlockingQueue<byte[]>(10);

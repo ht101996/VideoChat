@@ -5,7 +5,7 @@ import com.arcsoft.ais.arcvc.jni.P2PClient;
 public class P2PClientManager {
 	private static P2PClient p2pClient = null;
 
-	public static P2PClient getP2PClientInstance() {
+	private static P2PClient getP2PClientInstance() {
 		if (p2pClient == null) {
 			p2pClient = new P2PClient();
 		}

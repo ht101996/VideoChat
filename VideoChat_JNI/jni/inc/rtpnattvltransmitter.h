@@ -228,7 +228,6 @@ public:
 	RTPNATTVLTransmitter(RTPMemoryManager *mgr);
 	~RTPNATTVLTransmitter();
 
-	void AddToRawList(RTPRawPacket * pack);
 
 	int Init(bool treadsafe);
 	int Create(size_t maxpacksize,  RTPTransmissionParams *transparams);
@@ -301,9 +300,7 @@ private:
 	uint8_t multicastTTL;
 
 	std::list<uint32_t> localIPs;
-	uint16_t portbase;
-	bool supportsmulticasting;
-	POS_FILLER1;
+
 
 	RTPTransmitter::ReceiveMode receivemode;
 
@@ -346,6 +343,9 @@ private:
 	//CCmClientCallBack m_CMClientCallback;
 
 	Uint8 m_GPID[20];
+	uint16_t portbase;
+	bool supportsmulticasting;
+	POS_FILLER1;
 };
 
 #endif // RTPNATTVLTRANSMITTER_H

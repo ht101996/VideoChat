@@ -1,10 +1,11 @@
-package com.arcsoft.ais.arcvc.fragment;
+package com.arcsoft.videochat.fragment;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import com.arcsoft.ais.arcvc.jni.P2PClient;
 import com.arcsoft.ais.arcvc.utils.P2PClientManager;
 
 import android.app.Fragment;
@@ -26,6 +27,11 @@ public class AudioRecorderFragment extends Fragment {
 	private short audioFormat = AudioFormat.ENCODING_PCM_16BIT;
 	private short channelConfig = AudioFormat.CHANNEL_IN_MONO;
 	private boolean bSendingAudio = false;
+	private P2PClient p2pClient;
+	
+	public AudioRecorderFragment(P2PClient p2pClient) {
+		this.p2pClient = p2pClient;
+	}
 	private boolean setEncoder(int rate)
 	{
 		audioSampleRate = rate;
@@ -165,7 +171,7 @@ public class AudioRecorderFragment extends Fragment {
                                 fos.write(data, 0, outPacketSize);
                             }
                             outputBuffer.get(outData);
-                            P2PClientManager.getP2PClientInstance().sendAACESData(outData, outData.length, bufferInfo.presentationTimeUs);
+                            p2pClient.sendAACESData(outData, outData.length, bufferInfo.presentationTimeUs);
                             encoder.releaseOutputBuffer(outputBufferIndex, false);
                             outputBufferIndex = encoder.dequeueOutputBuffer(bufferInfo, 0);
                            

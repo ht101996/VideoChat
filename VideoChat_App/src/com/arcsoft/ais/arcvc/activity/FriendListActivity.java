@@ -35,6 +35,7 @@ import com.arcsoft.coreapi.sdk.CoreVCAPI;
 import com.arcsoft.coreapi.sdk.CoreVCDef.FriendListResponse;
 import com.arcsoft.coreapi.sdk.CoreVCDef.FriendResponse;
 import com.arcsoft.coreapi.sdk.CoreVCDef.PeerIdResponse;
+import com.arcsoft.videochat.activity.VideoChatActivity;
 
 /**
  * Activity which displays FriendListActivity screen to the user

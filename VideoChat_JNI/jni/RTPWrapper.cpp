@@ -62,7 +62,7 @@ static void notifyJNIH264DataReceived(const jbyte* data, int length, double time
 			LOGE("NewByteArray Out of memory, LINE: %d\n", __LINE__);
 			break;
 		}
-		LOGD("notifyJNIH264DataReceived resByteArr: %p, pixArrLen: %d, len: %d", resByteArr, jniEnv->GetArrayLength(resByteArr), length);
+//		LOGD("notifyJNIH264DataReceived resByteArr: %p, pixArrLen: %d, len: %d", resByteArr, jniEnv->GetArrayLength(resByteArr), length);
 		jniEnv->SetByteArrayRegion(resByteArr, 0, length, data);
 		if (jniEnv->ExceptionCheck()) {
 			LOGE("SetIntArrayRegion Exception.\n");
@@ -116,7 +116,7 @@ static void notifyJNIAACDataReceived(const jbyte* data, int length, double times
 			LOGE("NewByteArray Out of memory, LINE: %d\n", __LINE__);
 			break;
 		}
-		LOGD("notifyJNIAACDataReceived resByteArr: %p, pixArrLen: %d, len: %d", resByteArr, jniEnv->GetArrayLength(resByteArr), length);
+//		LOGD("notifyJNIAACDataReceived resByteArr: %p, pixArrLen: %d, len: %d", resByteArr, jniEnv->GetArrayLength(resByteArr), length);
 		jniEnv->SetByteArrayRegion(resByteArr, 0, length, data);
 		if (jniEnv->ExceptionCheck()) {
 			LOGE("SetIntArrayRegion Exception.\n");
@@ -140,30 +140,39 @@ static void notifyJNIAACDataReceived(const jbyte* data, int length, double times
 
 
 VideoRTPSession::VideoRTPSession():
-	  m_width(0)
-	, m_height(0)
-	, pNaluBuf(NULL)
-	, bufLen(0)
-	, timestamp(0)
-	, firstSequenceNum(0)
-	, extraDeltaTime(0)
-	, sequenceNum(0)
-	, eFrom(DEV_UNDEFINED)
+	 pNaluBuf(NULL)
+	,bufLen(0)
+	,pLock(NULL)
 {
 	pNaluBuf = (uint8_t*)malloc(NALU_BUF_SIZE);
+	pLock = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+	pthread_mutex_init(pLock, NULL);
 }
 
-VideoRTPSession::~VideoRTPSession()
+void VideoRTPSession::Destroy()
 {
+	pthread_mutex_lock(pLock);
 	if (pNaluBuf) {
 		free(pNaluBuf);
+		pNaluBuf = NULL;
+	}
+	pthread_mutex_unlock(pLock);
+}
+VideoRTPSession::~VideoRTPSession()
+{
+	if(pLock) {
+		pthread_mutex_destroy(pLock);
+		free(pLock);
+		pLock = NULL;
 	}
 }
 
 
 void VideoRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPacket &rtppack)
 {
-	LOGD("VideoRTPSession ProcessRTPPacket !");
+	pthread_mutex_lock(pLock);
+	if(!pNaluBuf)
+		return;
 	bool mark = rtppack.HasMarker();
 	if (mark) {// mark的pack是完整包的最后一个pack
 
@@ -171,29 +180,25 @@ void VideoRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPack
 		memcpy(pNaluBuf + bufLen,rtppack.GetPayloadData() + RTP_PKT_HEADER_LENGTH, len);
 		bufLen += len;
 
-		timestamp = *((double*)(rtppack.GetPayloadData()));
-		sequenceNum = *((uint32_t*)(rtppack.GetPayloadData()+ sizeof(double)));
-		LOGD("VideoRTPSession  Timestamp:%lf, SequenceNumber:%u, __LINE__: %d\n", timestamp, sequenceNum, __LINE__);
+		double timestamp = *((double*)(rtppack.GetPayloadData()));
+		uint32_t sequenceNum = *((uint32_t*)(rtppack.GetPayloadData()+ sizeof(double)));
+		LOGD("VideoRTPSession ProcessRTPPacket mark== true Timestamp:%lf, SequenceNumber:%u\n", timestamp, sequenceNum);
 
 		notifyJNIH264DataReceived((const jbyte* )pNaluBuf, bufLen, timestamp);
 		memset(pNaluBuf, 0, bufLen);
 		bufLen = 0;
 	} else {
 		size_t len = rtppack.GetPayloadLength() - RTP_PKT_HEADER_LENGTH;
-		LOGD("VideoRTPSession ProcessRTPPacket, mark== false, pNaluBuf:%p, bufLen:%d, len: %d, __LINE__: %d\n", pNaluBuf, bufLen, len, __LINE__);
+		LOGD("VideoRTPSession ProcessRTPPacket, mark== false, pNaluBuf:%p, bufLen:%d, len: %d\n", pNaluBuf, bufLen, len);
 		memcpy(pNaluBuf + bufLen, rtppack.GetPayloadData() + RTP_PKT_HEADER_LENGTH, len);
 		bufLen += len;
-
-
 	}
+	pthread_mutex_unlock(pLock);
 }
 
 AudioRTPSession::AudioRTPSession() :
 	  pNaluBuf(NULL)
 	, bufLen(0)
-	, m_videoSess(NULL)
-	, isSendEnded(true)
-	, m_isPlaying(false)
 {
 	pNaluBuf = (uint8_t*)malloc(NALU_BUF_SIZE);
 	if (pNaluBuf == NULL) {
@@ -201,13 +206,22 @@ AudioRTPSession::AudioRTPSession() :
 	}
 }
 
+void AudioRTPSession::Destroy()
+{
+	if (pNaluBuf) {
+		free(pNaluBuf);
+		pNaluBuf = NULL;
+	}
+
+}
+
 AudioRTPSession::~AudioRTPSession()
 {
 	if (pNaluBuf) {
 		free(pNaluBuf);
+		pNaluBuf = NULL;
 	}
 
-	isSendEnded = true;
 }
 
 void AudioRTPSession::ProcessRTPPacket(const RTPSourceData &srcdat,const RTPPacket &rtppack)
@@ -304,36 +318,40 @@ void AVBaseRTPSession::OnRTCPCompoundPacket(RTCPCompoundPacket *pack,const RTPTi
         {
              switch (rtcppack->GetPacketType())
              {
-                  case RTCPPacket::SR:
-                  {
-                      RTCPSRPacket *p = (RTCPSRPacket *)rtcppack;
-                      uint32_t senderssrc = p->GetSenderSSRC();
+			case RTCPPacket::SR: {
+				RTCPSRPacket *p = (RTCPSRPacket *) rtcppack;
+				uint32_t senderssrc = p->GetSenderSSRC();
+				int num = p->GetReceptionReportCount();
+				for (int i = 0; i < num; i++) {
+					if (p->GetSSRC(i) == GetLocalSSRC()) {
+						unsigned int rtt = ((receivetime.ntptimetran() - p->GetLSR(i) - p->GetDLSR(i)) * 1000) / 65536;
+						LOGD("Got RR  lostrate %d, lostpkt %d, jitter %u, rtt %u ownSSRC %u , senderSSRC %u \n",
+								p->GetFractionLost(i),
+								p->GetLostPacketCount(i),
+								p->GetJitter(i) * 1000 / 65536, rtt, GetLocalSSRC(), senderssrc);
+					}
+				}
+				LOGD("Got SR  NTP timestamp: GetMSW = %d  , GetLSW = %d\n", p->GetNTPTimestamp().GetMSW(), p->GetNTPTimestamp().GetLSW());
+				LOGD("Got SR  RTP timestamp: %d, Packet count:%d, Octet count:%d\n", p->GetRTPTimestamp(), p->GetSenderPacketCount(), p->GetSenderOctetCount());
 
-                      LOGD("Got SR  NTP timestamp: GetMSW = %d  , GetLSW = %d\n", p->GetNTPTimestamp().GetMSW(), p->GetNTPTimestamp().GetLSW());
-                      LOGD("Got SR  RTP timestamp: %d, Packet count:%d, Octet count:%d\n",  p->GetRTPTimestamp(), p->GetSenderPacketCount(), p->GetSenderOctetCount());
+			}
+				break;
 
-                  }
-                  break;
+			case RTCPPacket::RR: {
+				RTCPRRPacket *p = (RTCPRRPacket *) rtcppack;
+				int num = p->GetReceptionReportCount();
+				if (num == 0)
+					return;
 
-                  case RTCPPacket::RR:
-                  {
-                      RTCPRRPacket *p = (RTCPRRPacket *)rtcppack;
-                      int num = p->GetReceptionReportCount();
-					  if(num == 0)
-						   return;
+				int index = 0;
 
-                      int index = 0;
+				unsigned int rtt = ((receivetime.ntptimetran()
+						- p->GetLSR(index) - p->GetDLSR(index)) * 1000) / 65536;
+				LOGD("Got RR  lostrate %d%%, lostpkt %d, jitter %ums, rtt %ums \n", p->GetFractionLost(index), p->GetLostPacketCount(index), p->GetJitter(index) * 1000 / 65536, rtt);
 
-                      unsigned int rtt = ((receivetime.ntptimetran() - p->GetLSR(index) - p->GetDLSR(index))*1000)/65536;
-                      LOGD("Got RR  lostrate %d%%, lostpkt %d, jitter %ums, rtt %ums \n",
-                           p->GetFractionLost(index),
-                           p->GetLostPacketCount(index),
-                           p->GetJitter(index) * 1000 / 65536,
-                           rtt );
-
-                  }
-                  break;
-             }
+			}
+				break;
+			}
         }
     }
 

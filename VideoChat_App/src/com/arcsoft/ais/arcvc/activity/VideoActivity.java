@@ -27,15 +27,16 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import com.arcsoft.ais.arcvc.R;
-import com.arcsoft.ais.arcvc.fragment.RemoteDisplayFragment;
 import com.arcsoft.ais.arcvc.jni.P2PClient;
 import com.arcsoft.ais.arcvc.jni.P2PClient.DateReceivedListener;
 import com.arcsoft.ais.arcvc.utils.CameraUtils;
 import com.arcsoft.ais.arcvc.utils.Configer;
 import com.arcsoft.ais.arcvc.utils.Global;
 import com.arcsoft.ais.arcvc.utils.P2PClientManager;
-import com.es.app.videochat.recorder.AACDecoder;
-import com.es.app.videochat.recorder.H264Decoder;
+import com.arcsoft.videochat.activity.VideoChatApplication;
+import com.arcsoft.videochat.codec.AACDecoder;
+import com.arcsoft.videochat.codec.H264Decoder;
+import com.arcsoft.videochat.fragment.RemoteDisplayFragment;
 import com.es.app.videochat.recorder.MediaDataCenter;
 
 
@@ -97,7 +98,7 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 		findViewById(R.id.stopBtn).setOnClickListener(this);
 		findViewById(R.id.requestBtn).setOnClickListener(this);
 		
-		remoteFragment = new RemoteDisplayFragment();
+		remoteFragment = new RemoteDisplayFragment(p2pClient);
 		FragmentTransaction ft = getFragmentManager().beginTransaction();
 		ft.add(R.id.remote_display_fragment, remoteFragment);
 		ft.commit();
@@ -149,7 +150,7 @@ public class VideoActivity extends Activity implements View.OnClickListener{
 		
 	}
 	private void initP2PClien(DateReceivedListener dateReceivedListener) {
-		p2pClient = P2PClientManager.getP2PClientInstance();
+		p2pClient = ((VideoChatApplication)getApplication()).getP2PClient();
 		p2pClient.startRTPSession(remotePeerId);
 		p2pClient.setDateReceivedListener(dateReceivedListener);
 	}

@@ -1,8 +1,9 @@
-package com.arcsoft.ais.arcvc.fragment;
+package com.arcsoft.videochat.fragment;
 
 import java.io.IOException;
 import java.util.List;
 
+import android.R.anim;
 import android.app.Activity;
 import android.app.Fragment;
 import android.graphics.ImageFormat;
@@ -20,7 +21,10 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import com.arcsoft.ais.arcvc.R;
-import com.es.app.videochat.recorder.ESNativeH264Encoder;
+import com.arcsoft.ais.arcvc.jni.H264Nal;
+import com.arcsoft.ais.arcvc.jni.P2PClient;
+import com.arcsoft.videochat.codec.ESNativeH264Encoder;
+import com.arcsoft.videochat.codec.EncoderListener;
 import com.es.app.videochat.recorder.ESVideoQuality;
 import com.es.app.videochat.recorder.ESRecordListener.OnEncoderListener;
 import com.es.app.videochat.recorder.VideoFrameItem;
@@ -38,12 +42,17 @@ public class CameraFragment extends Fragment implements PreviewCallback {
 	private int previewFps;
 
 	private ESNativeH264Encoder h264Encoder;
+	private EncoderListener encoderListener;
 	private boolean isSendingData = false;
+	private P2PClient p2pClient;
 	
-	public CameraFragment(int previewWidth, int previewHeight, int previewfps) {
+	public CameraFragment(int previewWidth, int previewHeight, int previewfps, P2PClient p2pClient) {
 		this.previewWidth = previewWidth;
 		this.previewHeight = previewHeight;
 		this.previewFps = previewfps;
+		this.p2pClient = p2pClient;
+		if(android.os.Build.VERSION.SDK_INT > 20)
+			cameraID = CameraInfo.CAMERA_FACING_BACK;
 	}
 	
 	@Override
@@ -98,6 +107,7 @@ public class CameraFragment extends Fragment implements PreviewCallback {
 	@Override
 	public void onResume() {
 		openCamera();
+		initH264Encoder();
 		super.onResume();
 	}
 	
@@ -233,14 +243,30 @@ public class CameraFragment extends Fragment implements PreviewCallback {
 	
 	private void initH264Encoder() {
 		h264Encoder = new ESNativeH264Encoder(previewFormat);
+		initEncoderListener();
 		h264Encoder.setEncoderListener(encoderListener);	
 		ESVideoQuality videoQuality = new ESVideoQuality(previewWidth,previewHeight,previewFps,125000);
 		h264Encoder.setupCodec(videoQuality);
-		
-		
 	}
-	private OnEncoderListener encoderListener;
-	public void setEncoderListener(OnEncoderListener listener) {
-		this.encoderListener = listener;
+	
+	private void initEncoderListener() {
+		encoderListener = new EncoderListener() {
+			
+			@Override
+			public void onH264EncodeFinished(String type, byte[] data, long timestamp) {
+				H264Nal nalu = new H264Nal();
+				nalu.setType(data[0] & 0x1f);
+				nalu.setRefIdc((data[0] & 0x60) >>> 5);
+				nalu.setPayload(data);
+				nalu.setPayloadLength(data.length);
+				p2pClient.send264Packet2(type, nalu, timestamp);
+				
+			}
+		};
 	}
+	
+//	public void setEncoderListener(EncoderListener listener) {
+//		this.encoderListener = listener;
+//	}
+	
 }

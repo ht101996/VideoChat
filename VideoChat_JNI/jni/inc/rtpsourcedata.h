@@ -63,13 +63,14 @@ public:
 	uint32_t GetByteCount() const						{ return bytecount; }
 	RTPTime GetReceiveTime() const						{ return receivetime; }
 private:
-	bool hasinfo;
-	POS_FILLER3;
+
 	RTPNTPTime ntptimestamp;
 	uint32_t rtptimestamp;
 	uint32_t packetcount;
 	uint32_t bytecount;
 	RTPTime receivetime;
+		bool hasinfo;
+	POS_FILLER3;
 };
 
 class RTCPReceiverReportInfo
@@ -88,8 +89,7 @@ public:
 	uint32_t GetDelaySinceLastSR() const					{ return dlsr; }
 	RTPTime GetReceiveTime() const						{ return receivetime; }
 private:
-	bool hasinfo;
-	POS_FILLER3;
+
 	double fractionlost;
 	int32_t packetslost;
 	uint32_t exthighseqnr;
@@ -97,6 +97,8 @@ private:
 	uint32_t lsr;
 	uint32_t dlsr;
 	RTPTime receivetime;
+		bool hasinfo;
+	POS_FILLER3;
 };
 
 class RTPSourceStats
@@ -123,8 +125,7 @@ public:
 	void SetLastNoteTime(const RTPTime &t)					{ lastnotetime = t; }
 	RTPTime GetLastNoteTime() const						{ return lastnotetime; }
 private:
-	bool sentdata;
-	POS_FILLER3;
+
 	uint32_t packetsreceived;
 	uint32_t numcycles; // shifted left 16 bits
 	uint32_t baseseqnr;
@@ -138,10 +139,12 @@ private:
 	uint32_t numnewpackets;
 	uint32_t savedextseqnr;
 #ifdef RTP_SUPPORT_PROBATION
-	uint16_t prevseqnr;
-	POS_FILLER2;
+
 	int probation;
 	RTPSources::ProbationType probationtype;
+	uint16_t prevseqnr;
+	bool sentdata;
+	POS_FILLER1;
 #endif // RTP_SUPPORT_PROBATION
 };
 	

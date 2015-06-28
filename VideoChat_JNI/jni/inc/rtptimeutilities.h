@@ -156,14 +156,27 @@ inline RTPTime::RTPTime(RTPNTPTime ntptime)
 
  inline uint32_t RTPTime::ntptimetran() const
 {
- uint32_t recvtime, ntplsw, ntpmsw;
- ntpmsw = GetSeconds() + (uint32_t)RTP_NTPTIMEOFFSET;
- ntplsw = (uint32_t) ((double)GetMicroSeconds()*(65536.0*65536.0)/1000000.0);
+ uint32_t recvtime;
+ /*
+ uint32_t ntplsw, ntpmsw;
+ ntpmsw =sec + (uint32_t)RTP_NTPTIMEOFFSET;
+ ntplsw = (uint32_t) (microsec*(65536.0*65536.0)/1000000.0);
  recvtime = ((ntpmsw<<16)&0xFFFF0000)|((ntplsw>>16)&0x0000FFFF);
+*/
+ 						RTPNTPTime srtime = GetNTPTime();
+						uint32_t m = (srtime.GetMSW()&0xFFFF);
+						uint32_t l = ((srtime.GetLSW()>>16)&0xFFFF);
+						recvtime = ((m<<16)|l);
+
   return recvtime;
 }
 
-
+/*
+ 						RTPNTPTime srtime = srcdat->SR_GetNTPTimestamp();
+						uint32_t m = (srtime.GetMSW()&0xFFFF);
+						uint32_t l = ((srtime.GetLSW()>>16)&0xFFFF);
+						lsr = ((m<<16)|l);
+*/
 #if (defined(WIN32) || defined(_WIN32_WCE))
 
 inline unsigned __int64 RTPTime::CalculateMicroseconds(unsigned __int64 performancecount,unsigned __int64 performancefrequency)

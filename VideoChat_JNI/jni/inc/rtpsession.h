@@ -520,9 +520,7 @@ private:
 	bool usingpollthread;
 	bool acceptownpackets;
 
-	bool useSR_BYEifpossible;
-	bool sentpackets;
-	POS_FILLER2;
+
 
 	size_t maxpacksize;
 	double sessionbandwidth;
@@ -550,6 +548,9 @@ private:
 #endif // RTP_SUPPORT_THREAD
 	friend class RTPSessionSources;
 	friend class RTCPSessionPacketBuilder;
+	bool useSR_BYEifpossible;
+	bool sentpackets;
+	POS_FILLER2;
 };
 
 #endif // RTPSESSION_H

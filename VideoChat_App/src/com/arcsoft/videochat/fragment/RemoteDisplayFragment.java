@@ -1,10 +1,11 @@
-package com.arcsoft.ais.arcvc.fragment;
+package com.arcsoft.videochat.fragment;
 
 import com.arcsoft.ais.arcvc.R;
+import com.arcsoft.ais.arcvc.jni.P2PClient;
 import com.arcsoft.ais.arcvc.jni.P2PClient.DateReceivedListener;
 import com.arcsoft.ais.arcvc.utils.CameraUtils;
-import com.es.app.videochat.recorder.AACDecoder;
-import com.es.app.videochat.recorder.H264Decoder;
+import com.arcsoft.videochat.codec.AACDecoder;
+import com.arcsoft.videochat.codec.H264Decoder;
 import com.es.app.videochat.recorder.MediaDataCenter;
 
 import android.app.Fragment;
@@ -28,24 +29,32 @@ public class RemoteDisplayFragment extends Fragment implements DateReceivedListe
 	private boolean aacDcoderStarted = false;
 	
 	private TextureView mPlaybackView;
+	private P2PClient p2pClient;
+	public RemoteDisplayFragment(P2PClient p2pClient) {
+		this.p2pClient = p2pClient;
+	}
 	
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		initDecoders();
+		initMediaDataCenter();
+	}
+	@Override
+	public void onActivityCreated(Bundle savedInstanceState) {
+		super.onActivityCreated(savedInstanceState);
+		p2pClient.setDateReceivedListener(this);
 	}
 	
 	@Override
 	public void onPause() {
 		super.onPause();
-		stopDecode();
-		mMediaDataCenter.stop();
+		stopDecoder();
+		
 	}
 	
 	@Override
 	public void onResume() {
 		super.onResume();
-		mMediaDataCenter.start();
 	}
 	
 	
@@ -74,15 +83,14 @@ public class RemoteDisplayFragment extends Fragment implements DateReceivedListe
 			public void onSurfaceTextureAvailable(SurfaceTexture surface, int width,
 					int height) {
 				Log.d(tag, "onSurfaceTextureAvailable");
-				startH264Decoder();
+				initDecoders();
+				startDecoder();
 			}
 		});
 		return view;
 	}
 	
-	private void initDecoders() {
-		h264Decoder = new H264Decoder(CameraUtils.previewSize_width, CameraUtils.previewSize_Height, 15);
-		aacDecoder = new AACDecoder();
+	private void initMediaDataCenter() {
 		mMediaDataCenter = MediaDataCenter.getInstance(new MediaDataCenter.DataDecodeListener() {
 			
 			@Override
@@ -91,7 +99,7 @@ public class RemoteDisplayFragment extends Fragment implements DateReceivedListe
 					h264Decoder.decode(data, timestampUs);
 				}catch(Exception e) {
 					e.printStackTrace();
-					h264Decoder.releaseDecoder();
+//					h264Decoder.releaseDecoder();
 				}
 			}
 			
@@ -107,9 +115,14 @@ public class RemoteDisplayFragment extends Fragment implements DateReceivedListe
 			}
 		});
 	}
+	
+	private void initDecoders() {
+		h264Decoder = new H264Decoder();
+		h264Decoder.setupDecoder(CameraUtils.previewSize_width, CameraUtils.previewSize_Height, new Surface(mPlaybackView.getSurfaceTexture()));
+		aacDecoder = new AACDecoder();
+	}
 	private void startH264Decoder() {
 		if(!H264DecoderStarted) {
-			h264Decoder.setupDecoder(new Surface(mPlaybackView.getSurfaceTexture()));
 			h264Decoder.startDecoder();
 		}
 		H264DecoderStarted = true;
@@ -135,35 +148,40 @@ public class RemoteDisplayFragment extends Fragment implements DateReceivedListe
 		}
 		aacDcoderStarted = false;
 	}
-	private void stopDecode(){
+	
+	private void startDecoder() {
+		startH264Decoder();
+		startAACDecoder();
+		mMediaDataCenter.start();
+	}
+	
+	private void stopDecoder(){
+		mMediaDataCenter.stop();
 		stopH264Decoder();
 		stopAACDecoder();
 	}
-//	private DateReceivedListener dateReceivedListener = new DateReceivedListener() {
 		
-		@Override
-		public void onH264DataReceived(byte[] arg0, int offset, int length, double timestamp) {
+	@Override
+	public void onH264DataReceived(byte[] arg0, int offset, int length, double timestamp) {
 //			if(!H264DecoderStarted) {
 //				startH264Decoder(new Surface(mPlaybackView.getSurfaceTexture()));
 //				
 //			}
 //			h264Decoder.onFrame(arg0, 0, length, timestamp);
+		if(H264DecoderStarted)
 			mMediaDataCenter.addVideoFrame(new MediaDataCenter.VideoFrameItem(arg0, 0, length, timestamp));
-		}
-		@Override
-		public void onAACDataReceived(byte[] arg0, int offset, int length, double timestamp) {
-			if(!aacDcoderStarted) {
-				startAACDecoder();
-			}
-//			aacDecoder.onFrame(arg0, offset, length, timestamp);
+	}
+	
+	@Override
+	public void onAACDataReceived(byte[] arg0, int offset, int length, double timestamp) {
+		if(aacDcoderStarted) 
 			mMediaDataCenter.addAudioData(new MediaDataCenter.AudioStreamData(arg0, offset, length, timestamp));
-		}
+	}
+	
+	@Override
+	public void onStringMsgReceived(String remoteGPID, String msg) {
+		System.out.println("..cxd, onStringMsgReceived remoteGPID="+remoteGPID+", msg:"+remoteGPID);
 		
-		@Override
-		public void onStringMsgReceived(String remoteGPID, String msg) {
-			System.out.println("..cxd, onStringMsgReceived remoteGPID="+remoteGPID+", msg:"+remoteGPID);
-			
-		}
-//	};
+	}
 
 }

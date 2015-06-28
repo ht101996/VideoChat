@@ -97,11 +97,12 @@ protected:
 
 	uint8_t *compoundpacket;
 	size_t compoundpacketlength;
-	bool deletepacket;
-	POS_FILLER3;
+
 	
 	std::list<RTCPPacket *> rtcppacklist;
 	std::list<RTCPPacket *>::const_iterator rtcppackit;
+	bool deletepacket;
+	POS_FILLER3;
 };
 
 #endif // RTCPCOMPOUNDPACKET_H

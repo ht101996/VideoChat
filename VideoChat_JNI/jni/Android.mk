@@ -12,7 +12,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/inc \
 LOCAL_LDLIBS := -llog -lz -lc -lm \
 
 LOCAL_LDFLAGS += -L$(LOCAL_PATH)/libs \
-				 -lp2p_interface -lrudp -lcms -lcmc -lorm -larcsoft_aes -lmsgcc -lmsgcs -losplatform -lJrtp -lJthread \
+				 -lp2p_interface -lcms -lcmc -lorm -larcsoft_aes -lmsgcc -lmsgcs -losplatform -lJrtp -lJthread \
 
 
 #LOCAL_LDLIBS := -Llibs -L$(SYSROOT)/usr/lib -lp2p_interface -luftp -lrudp -lcms -lcmc -lorm -larcsoft_aes -lmsgcc -lmsgcs -losplatform -lJrtp -lJthread -lffmpeg -llog -lstdc++ -lc -ldl -lm

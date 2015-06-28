@@ -46,7 +46,7 @@
 
 #define RTPSOURCES_HASHSIZE							8317
 
-#define RR_SR_LOG_SWITCH	0
+#define RR_SR_LOG_SWITCH	1
 
 class RTPSources_GetHashIndex
 {

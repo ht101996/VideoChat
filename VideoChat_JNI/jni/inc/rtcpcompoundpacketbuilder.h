@@ -362,11 +362,11 @@ private:
 		std::list<SDESSource *>::const_iterator sdesit;
 	};
 
+	void ClearBuildBuffers();
+
 	size_t maximumpacketsize;
 	uint8_t *buffer;
-	bool external;
-	bool arebuilding;
-	POS_FILLER2;
+
 	
 	Report report;
 	SDES sdes;
@@ -376,8 +376,11 @@ private:
 	
 	std::list<Buffer> apppackets;
 	size_t appsize;
+	bool external;
+	bool arebuilding;
+	POS_FILLER2;
 	
-	void ClearBuildBuffers();
+
 };
 
 #endif // RTCPCOMPOUNDPACKETBUILDER_H

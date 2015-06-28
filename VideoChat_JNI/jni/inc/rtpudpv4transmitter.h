@@ -247,10 +247,7 @@ private:
 	bool ShouldAcceptData(uint32_t srcip,uint16_t srcport);
 	void ClearAcceptIgnoreInfo();
 	
-	bool init;
-	bool created;
-	bool waitingfordata;
-	POS_FILLER1;
+
 #if (defined(WIN32) || defined(_WIN32_WCE))
 	SOCKET rtpsock,rtcpsock;
 #else // not using winsock
@@ -299,6 +296,10 @@ private:
 	JMutex mainmutex,waitmutex;
 	int threadsafe;
 #endif // RTP_SUPPORT_THREAD
+	bool init;
+	bool created;
+	bool waitingfordata;
+	POS_FILLER1;
 };
 
 #endif // RTPUDPV4TRANSMITTER_H

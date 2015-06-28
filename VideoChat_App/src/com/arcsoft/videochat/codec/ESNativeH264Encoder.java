@@ -1,4 +1,4 @@
-package com.es.app.videochat.recorder;
+package com.arcsoft.videochat.codec;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -8,6 +8,12 @@ import java.util.Arrays;
 
 import com.arcsoft.ais.arcvc.jni.H264Nal;
 import com.arcsoft.ais.arcvc.utils.P2PClientManager;
+import com.es.app.videochat.recorder.ESVideoEncoder;
+import com.es.app.videochat.recorder.ESVideoQuality;
+import com.es.app.videochat.recorder.MediaCodecUtils;
+import com.es.app.videochat.recorder.TimeMonitor;
+import com.es.app.videochat.recorder.VideoFrameItem;
+import com.es.app.videochat.recorder.ESRecordListener.OnEncoderListener;
 
 import android.graphics.ImageFormat;
 import android.media.MediaCodec;
@@ -17,13 +23,16 @@ import android.media.MediaFormat;
 import android.os.Environment;
 import android.util.Log;
 
-public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnable {
-
-	public final String TAG = "ESNativeH264Encoder";
+public final class ESNativeH264Encoder implements Runnable {
+	private final String tag = ESNativeH264Encoder.class.getSimpleName();
+	
+	private EncoderListener encoderListener;
+	
 	private final byte[] spsHeader = new byte[] {0x00, 0x00, 0x00, 0x01, 0x67};
 	private final byte[] ppsHeader = new byte[] {0x00, 0x00, 0x00, 0x01, 0x68};
 	private MediaCodec mediaCodec = null;  
 	private MediaFormat mediaFormat = null;
+	
     byte[] m_info = null;
     
     ESVideoQuality videoQuality = null;
@@ -115,16 +124,21 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
     public ESNativeH264Encoder(int imageFormat) {
     	inputDataImageFormat = imageFormat;
     }
-	@Override
+	public EncoderListener getEncoderListener() {
+		return encoderListener;
+	}
+	public void setEncoderListener(EncoderListener encoderListener) {
+		this.encoderListener = encoderListener;
+	}
 	public boolean setupCodec(ESVideoQuality videoQuality)
 	{
 		String mimeType = "video/avc";
         MediaCodecInfo codecInfo = MediaCodecUtils.selectCodec(mimeType);
         if(codecInfo == null) {
-        	 Log.d(TAG, "Can't find media codec correspondint to MIME:" + mimeType);
+        	 Log.d(tag, "Can't find media codec correspondint to MIME:" + mimeType);
         	 return false;
         }
-        Log.d(TAG, "Found " + codecInfo.getName() + " supporting " + mimeType);
+        Log.d(tag, "Found " + codecInfo.getName() + " supporting " + mimeType);
         
         MediaCodecInfo.CodecCapabilities capabilities = codecInfo.getCapabilitiesForType(mimeType);
         for (int i = 0; i < capabilities.colorFormats.length && colorFormat == 0; i++) {
@@ -138,7 +152,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
                 colorFormat = format;
                 break;
             default:
-                Log.d(TAG, "Skipping unsupported color format " + format);
+                Log.d(tag, "Skipping unsupported color format " + format);
                 break;
             }
         }
@@ -162,7 +176,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 		if (codecInfo.getName().equals("OMX.TI.DUCATI1.VIDEO.H264E")) {
             // This codec doesn't support a width not a multiple of 16,
             // so round down.
-			Log.d(TAG, "Codec " + "OMX.TI.DUCATI1.VIDEO.H264E");
+			Log.d(tag, "Codec " + "OMX.TI.DUCATI1.VIDEO.H264E");
             width &= ~15;
         }
         
@@ -171,7 +185,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
         if (codecInfo.getName().startsWith("OMX.Nvidia.")) {
             stride = (stride + 15)/16*16;
             sliceHeight = (sliceHeight + 15)/16*16;
-            Log.d(TAG, "Codec " + "OMX.Nvidia");
+            Log.d(tag, "Codec " + "OMX.Nvidia");
         }
         if(codecInfo.getName().startsWith("OMX.qcom"))
         {
@@ -197,7 +211,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
         return true;
 	}
 	
-	@Override
+	
 	public void stop() {
 		bThreadStop = true;
 		encodeThread = null;
@@ -214,14 +228,14 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
        
 	}
 	
-	@Override
+
 	public void release() {
 		if(mediaCodec != null)
 			 mediaCodec.release();  
         mediaCodec = null;
 	}
 	
-	@Override
+	
 	public void start(boolean async)
 	{
 		
@@ -359,7 +373,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 			System.arraycopy(m_info, ppsPos, h264ppsBytes, 0, ppsLength);
 		}
 		else
-			Log.e(TAG, "Found SPS PPS info failed!");
+			Log.e(tag, "Found SPS PPS info failed!");
 	}
 	
 	private void sendSPSAndPPSPacket() {
@@ -378,16 +392,17 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
         set264Packet("img", naluData, timestamp);
 	}
 	
+	//TODO remove type
 	private void set264Packet(String type, byte[] naluData, long timestamp) {
-		H264Nal nalu = new H264Nal();
-		nalu.setType(naluData[0] & 0x1f);
-		nalu.setRefIdc((naluData[0] & 0x60) >>> 5);
-		nalu.setPayload(naluData);
-		nalu.setPayloadLength(naluData.length);
-		P2PClientManager.getP2PClientInstance().send264Packet2(type, nalu, timestamp);
+//		H264Nal nalu = new H264Nal();
+//		nalu.setType(naluData[0] & 0x1f);
+//		nalu.setRefIdc((naluData[0] & 0x60) >>> 5);
+//		nalu.setPayload(naluData);
+//		nalu.setPayloadLength(naluData.length);
+//		P2PClientManager.getP2PClientInstance().send264Packet2(type, nalu, timestamp);
 	    
 		if(encoderListener != null)
-	    	encoderListener.onEncodeFinished(naluData, timestamp);
+	    	encoderListener.onH264EncodeFinished(type, naluData, timestamp);
 	}
 	
 	private void catchSPSAndPPSInfo(byte[] outData) {
@@ -485,7 +500,7 @@ public final class ESNativeH264Encoder extends ESVideoEncoder implements Runnabl
 		}
 		}
 	}
-	@Override
+	
 	public void putData(VideoFrameItem videoFrame) {
 		if(mediaCodec != null)
 		{
